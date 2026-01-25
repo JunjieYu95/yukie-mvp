@@ -215,7 +215,7 @@ export function getLLMClient(): LLMClient {
     return clientInstance;
   }
 
-  const provider = process.env.LLM_PROVIDER?.toLowerCase() || 'anthropic';
+  const provider = (process.env.LLM_PROVIDER || 'anthropic').trim().toLowerCase();
 
   switch (provider) {
     case 'anthropic':
