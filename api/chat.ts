@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateRequest, hasScope, type AuthContext } from './_lib/auth';
+import { authenticateRequest, hasScope, type AuthContext } from './_lib/auth.js';
 import {
   processChatMessage,
   initializeRegistry,
   createLogger,
-} from './_lib/yukie-core';
+} from './_lib/yukie-core.js';
 
 // Wrap logger creation in try-catch to prevent cold start crashes
 let logger: ReturnType<typeof createLogger>;
