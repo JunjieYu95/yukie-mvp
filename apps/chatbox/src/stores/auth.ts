@@ -62,27 +62,25 @@ export const useAuthStore = defineStore('auth', () => {
         }),
       });
 
-      if (!response.ok) {
-        // Try to parse error as JSON, fallback to text
-        let errorMessage = 'Failed to generate token';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch {
-          const text = await response.text();
-          errorMessage = text || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      // Check content type before parsing JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
+      // Read the response body once
+      const contentType = response.headers.get('content-type') || '';
+      const isJson = contentType.includes('application/json');
+      
+      let data: any;
+      if (isJson) {
+        data = await response.json();
+      } else {
         const text = await response.text();
         throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
       }
 
-      const data = await response.json();
+      // Check if response was successful after parsing
+      if (!response.ok) {
+        const errorMessage = data.message || data.error || 'Failed to generate token';
+        throw new Error(errorMessage);
+      }
+
+      // Success - set auth
       setAuth(data.token, data.userId, data.scopes || []);
     } catch (error) {
       console.error('Failed to login:', error);
