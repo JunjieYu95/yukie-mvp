@@ -30,6 +30,12 @@ function handleModelChange(modelId: string) {
   settingsStore.setModel(modelId);
   showModelDropdown.value = false;
 }
+
+function handleModelButtonBlur() {
+  setTimeout(() => {
+    showModelDropdown.value = false;
+  }, 200);
+}
 </script>
 
 <template>
@@ -45,7 +51,7 @@ function handleModelChange(modelId: string) {
           <button
             class="model-button"
             @click="showModelDropdown = !showModelDropdown"
-            @blur="setTimeout(() => showModelDropdown = false, 200)"
+            @blur="handleModelButtonBlur"
           >
             <span class="model-label">Model:</span>
             <span class="model-name">{{ settingsStore.currentModel().name }}</span>

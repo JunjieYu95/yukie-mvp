@@ -33,6 +33,8 @@ coverage/
 
 # TypeScript
 *.tsbuildinfo
+vite.config.d.ts
+vite.config.js
 
 # Temporary files
 tmp/
@@ -41,3 +43,4 @@ temp/
 
 # Claude Code local settings
 .claude/
+.vercel

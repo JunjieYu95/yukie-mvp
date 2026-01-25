@@ -32,11 +32,10 @@ export const AVAILABLE_MODELS: ModelOption[] = [
 const MODEL_KEY = 'yukie_selected_model';
 
 export const useSettingsStore = defineStore('settings', () => {
-  const selectedModel = ref<string>(() => {
+  const selectedModel = ref<string>(
     // Load from localStorage or use default
-    const saved = localStorage.getItem(MODEL_KEY);
-    return saved || AVAILABLE_MODELS[0].id;
-  });
+    localStorage.getItem(MODEL_KEY) || AVAILABLE_MODELS[0].id
+  );
 
   function setModel(modelId: string) {
     selectedModel.value = modelId;
