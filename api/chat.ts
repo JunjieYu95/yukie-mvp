@@ -1,15 +1,148 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { ChatRequest, ChatResponse, AuthContext } from '../packages/shared/protocol/src/types';
-import { authenticateRequest } from '../packages/shared/auth/src/auth';
-import { initializeRegistry } from '../packages/yukie-core/src/registry';
-import { processChatMessage } from '../packages/yukie-core/src/router';
-import { canUseChat, checkRateLimit } from '../packages/yukie-core/src/policy';
-import { createLogger, startTimer } from '../packages/shared/observability/src/logger';
+import crypto from 'crypto';
 
-const logger = createLogger('api-chat');
+// ============================================================================
+// Inline Auth Utilities
+// ============================================================================
 
-// Initialize registry on cold start
-initializeRegistry();
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  return secret;
+}
+
+function base64UrlDecode(data: string): string {
+  let padded = data.replace(/-/g, '+').replace(/_/g, '/');
+  while (padded.length % 4) {
+    padded += '=';
+  }
+  return Buffer.from(padded, 'base64').toString('utf8');
+}
+
+function hmacVerify(message: string, signature: string, secret: string): boolean {
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(message);
+  const expectedSignature = hmac.digest('base64url');
+  return signature === expectedSignature;
+}
+
+interface JWTPayload {
+  sub: string;
+  scopes: string[];
+  iat: number;
+  exp: number;
+}
+
+interface AuthContext {
+  userId: string;
+  scopes: string[];
+}
+
+function validateToken(token: string): { valid: boolean; payload?: JWTPayload; error?: string } {
+  try {
+    const secret = getJwtSecret();
+    const parts = token.split('.');
+
+    if (parts.length !== 3) {
+      return { valid: false, error: 'Invalid token format' };
+    }
+
+    const [headerEncoded, payloadEncoded, signature] = parts;
+    const message = `${headerEncoded}.${payloadEncoded}`;
+
+    if (!hmacVerify(message, signature, secret)) {
+      return { valid: false, error: 'Invalid signature' };
+    }
+
+    const payload = JSON.parse(base64UrlDecode(payloadEncoded)) as JWTPayload;
+
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) {
+      return { valid: false, error: 'Token expired' };
+    }
+
+    return { valid: true, payload };
+  } catch (error) {
+    return { valid: false, error: `Token validation failed: ${error}` };
+  }
+}
+
+function authenticateRequest(authHeader?: string): { success: boolean; context?: AuthContext; error?: string } {
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { success: false, error: 'No bearer token provided' };
+  }
+
+  const token = authHeader.slice(7);
+  const result = validateToken(token);
+
+  if (!result.valid || !result.payload) {
+    return { success: false, error: result.error || 'Invalid token' };
+  }
+
+  return {
+    success: true,
+    context: {
+      userId: result.payload.sub,
+      scopes: result.payload.scopes,
+    },
+  };
+}
+
+// ============================================================================
+// Anthropic API Client
+// ============================================================================
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+async function callAnthropic(messages: ChatMessage[], model?: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+  }
+
+  const selectedModel = model || process.env.LLM_MODEL || 'claude-3-5-haiku-20241022';
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: selectedModel,
+      max_tokens: 4096,
+      system: 'You are Yukie, a helpful AI assistant. Be friendly, concise, and helpful.',
+      messages: messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json() as { content?: Array<{ text?: string }> };
+  return data.content?.[0]?.text || 'I could not generate a response.';
+}
+
+// ============================================================================
+// API Handler
+// ============================================================================
+
+interface ChatRequest {
+  message: string;
+  conversationId?: string;
+  model?: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -31,16 +164,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const timer = startTimer();
-
-  // Authenticate request
-  const authResult = await authenticateRequest({
-    authorizationHeader: req.headers.authorization as string,
-    yukieUserIdHeader: req.headers['x-yukie-user-id'] as string,
-    yukieScopesHeader: req.headers['x-yukie-scopes'] as string,
-    yukieRequestIdHeader: req.headers['x-yukie-request-id'] as string,
-  });
-
+  // Authenticate
+  const authResult = authenticateRequest(req.headers.authorization);
   if (!authResult.success || !authResult.context) {
     res.status(401).json({
       error: 'Unauthorized',
@@ -49,42 +174,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const auth: AuthContext = authResult.context;
-
-  // Check policy
-  const policyResult = canUseChat(auth);
-  if (!policyResult.allowed) {
+  // Check for chat scope
+  if (!authResult.context.scopes.includes('yukie:chat')) {
     res.status(403).json({
       error: 'Forbidden',
-      message: policyResult.reason,
-      missingScopes: policyResult.missingScopes,
+      message: 'Missing required scope: yukie:chat',
     });
     return;
   }
 
-  // Check rate limit
-  const rateResult = checkRateLimit(auth.userId, 'chat');
-  res.setHeader('X-RateLimit-Remaining', String(rateResult.remaining || 0));
-  res.setHeader('X-RateLimit-Reset', String(rateResult.resetAt || 0));
-
-  if (!rateResult.allowed) {
-    res.status(429).json({
-      error: 'Too Many Requests',
-      message: rateResult.reason,
-      resetAt: rateResult.resetAt,
-    });
-    return;
-  }
-
-  // Validate request body
+  // Validate request
   const body = req.body as ChatRequest;
-  if (!body.message || typeof body.message !== 'string') {
+  if (!body.message || typeof body.message !== 'string' || body.message.trim().length === 0) {
     res.status(400).json({ error: 'Bad Request', message: 'message is required' });
-    return;
-  }
-
-  if (body.message.trim().length === 0) {
-    res.status(400).json({ error: 'Bad Request', message: 'message cannot be empty' });
     return;
   }
 
@@ -94,46 +196,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    logger.info('Processing chat message', {
-      userId: auth.userId,
-      conversationId: body.conversationId,
-      messageLength: body.message.length,
+    // Call Anthropic API
+    const response = await callAnthropic(
+      [{ role: 'user', content: body.message }],
+      body.model
+    );
+
+    const conversationId = body.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    res.status(200).json({
+      response,
+      conversationId,
     });
-
-    // Process the message
-    const result = await processChatMessage({
-      message: body.message,
-      auth,
-      conversationId: body.conversationId,
-      model: body.model,
-    });
-
-    const timing = timer();
-
-    // Build response
-    const response: ChatResponse = {
-      response: result.response,
-      conversationId: body.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-      serviceUsed: result.serviceUsed,
-      actionInvoked: result.actionInvoked,
-      routingDetails: result.routingDetails,
-    };
-
-    logger.info('Chat message processed', {
-      userId: auth.userId,
-      serviceUsed: result.serviceUsed,
-      actionInvoked: result.actionInvoked,
-      durationMs: timing.durationMs,
-    });
-
-    res.status(200).json(response);
   } catch (error) {
-    const timing = timer();
-    logger.error('Chat processing error', error, { durationMs: timing.durationMs });
-
+    console.error('Chat error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'An error occurred while processing your message',
+      message: error instanceof Error ? error.message : 'An error occurred while processing your message',
     });
   }
 }
