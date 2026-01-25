@@ -1,8 +1,8 @@
-import type { YNFPRoutingResult, YWAIPInvokeRequest, YWAIPInvokeResponse, AuthContext } from '../../shared/protocol/src/types';
-import { getRegistry } from './registry';
-import { getLLMClient, completeWithJSON } from './llm/client';
-import { buildRoutingPrompt, buildRoutingUserMessage, buildFallbackPrompt, buildResponseFormattingPrompt } from './llm/prompts';
-import { createLogger, startTimer } from '../../shared/observability/src/logger';
+import type { YNFPRoutingResult, YWAIPInvokeRequest, YWAIPInvokeResponse, AuthContext } from '../../shared/protocol/src/types.js';
+import { getRegistry } from './registry.js';
+import { getLLMClient, completeWithJSON } from './llm/client.js';
+import { buildRoutingPrompt, buildRoutingUserMessage, buildFallbackPrompt, buildResponseFormattingPrompt } from './llm/prompts.js';
+import { createLogger, startTimer } from '../../shared/observability/src/logger.js';
 
 const logger = createLogger('router');
 

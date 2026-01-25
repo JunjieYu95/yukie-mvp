@@ -1,4 +1,4 @@
-import type { ServiceRegistryEntry } from '../../../shared/protocol/src/types';
+import type { ServiceRegistryEntry } from '../../../shared/protocol/src/types.js';
 
 // ============================================================================
 // Candidate Tool Type (for retrieval-based routing)

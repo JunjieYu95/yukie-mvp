@@ -1,5 +1,5 @@
-import type { LLMMessage, LLMCompletionOptions, LLMCompletionResult } from '../../../shared/protocol/src/types';
-import { createLogger } from '../../../shared/observability/src/logger';
+import type { LLMMessage, LLMCompletionOptions, LLMCompletionResult } from '../../../shared/protocol/src/types.js';
+import { createLogger } from '../../../shared/observability/src/logger.js';
 
 const logger = createLogger('llm-client');
 
