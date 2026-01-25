@@ -1,8 +1,12 @@
 /**
  * Yukie Core - Bundled for Vercel Serverless
  *
- * This file re-exports all yukie-core functionality for use in Vercel serverless functions.
- * It uses relative imports to ensure proper bundling.
+ * This file re-exports yukie-core functionality for use in Vercel serverless functions.
+ * Uses relative imports to ensure proper bundling.
+ *
+ * NOTE: Only exports essential functions to avoid module resolution conflicts.
+ * The new enhanced registry/router modules are available but not exported here
+ * to prevent conflicts with existing files.
  */
 
 // Re-export types from protocol
@@ -56,7 +60,7 @@ export {
   buildConversationSummaryPrompt,
 } from '../../packages/yukie-core/src/llm/prompts';
 
-// Re-export registry
+// Re-export original registry (registry.ts file)
 export {
   getRegistry,
   resetRegistry,
@@ -64,7 +68,7 @@ export {
   initializeRegistry,
 } from '../../packages/yukie-core/src/registry';
 
-// Re-export router (original)
+// Re-export original router (router.ts file)
 export {
   routeMessage,
   invokeService,
@@ -77,59 +81,3 @@ export type {
   ChatFlowOptions,
   ChatFlowResult,
 } from '../../packages/yukie-core/src/router';
-
-// Re-export enhanced registry
-export {
-  EnhancedServiceRegistry,
-  getEnhancedRegistry,
-  resetEnhancedRegistry,
-  CapabilityIndex,
-  getCapabilityIndex,
-  ManifestCache,
-  getManifestCache,
-} from '../../packages/yukie-core/src/registry/index';
-
-// Re-export retrieval router
-export {
-  RetrievalRouter,
-  getRetrievalRouter,
-  routeWithRetrieval,
-  KeywordExtractor,
-  getKeywordExtractor,
-} from '../../packages/yukie-core/src/router/index';
-
-// Re-export planner
-export {
-  Planner,
-  getPlanner,
-} from '../../packages/yukie-core/src/planner/index';
-
-// Re-export executor
-export {
-  Executor,
-  getExecutor,
-  ParameterValidator,
-  getValidator,
-} from '../../packages/yukie-core/src/executor/index';
-
-// Re-export composer
-export {
-  ResponseComposer,
-  getComposer,
-} from '../../packages/yukie-core/src/composer/index';
-
-// Re-export security
-export {
-  RiskClassifier,
-  getRiskClassifier,
-  ConfirmationGate,
-  getConfirmationGate,
-  InputSanitizer,
-  getInputSanitizer,
-} from '../../packages/yukie-core/src/security/index';
-
-// Re-export audit
-export {
-  AuditLogger,
-  getAuditLogger,
-} from '../../packages/yukie-core/src/audit/index';
