@@ -3,6 +3,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "apps/chatbox/dist",
   "framework": null,
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "packages/**/*"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/healthz", "destination": "/api/health" },
