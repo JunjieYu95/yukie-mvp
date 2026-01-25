@@ -1,7 +1,18 @@
 import type { ServiceRegistryEntry } from '../../../shared/protocol/src/types';
 
 // ============================================================================
-// Routing Prompt
+// Candidate Tool Type (for retrieval-based routing)
+// ============================================================================
+
+interface CandidateTool {
+  serviceId: string;
+  serviceName: string;
+  serviceDescription: string;
+  matchScore: number;
+}
+
+// ============================================================================
+// Routing Prompt (Original - for backward compatibility)
 // ============================================================================
 
 export function buildRoutingPrompt(services: ServiceRegistryEntry[]): string {
@@ -34,6 +45,83 @@ export function buildRoutingUserMessage(userMessage: string): string {
   return `User request: "${userMessage}"
 
 Determine which service should handle this request. Respond with JSON only.`;
+}
+
+// ============================================================================
+// Candidate-Based Routing Prompt (for retrieval-based routing)
+// ============================================================================
+
+export function buildCandidateRoutingPrompt(candidates: CandidateTool[]): string {
+  const candidateDescriptions = candidates
+    .map(
+      (c, i) =>
+        `${i + 1}. ${c.serviceId}: ${c.serviceName}\n   Description: ${c.serviceDescription}\n   Match Score: ${c.matchScore.toFixed(2)}`
+    )
+    .join('\n\n');
+
+  return `You are Yukie, an intelligent assistant router. Your job is to select the best service to handle a user's request from a pre-filtered list of candidates.
+
+The candidates have been pre-selected based on keyword matching. You need to make the final decision.
+
+Available candidate services:
+${candidateDescriptions}
+
+Rules:
+1. Select the service that best matches the user's intent
+2. If no service is a good match, respond with targetService: "none"
+3. Provide a confidence score from 0.0 to 1.0
+4. Give brief reasoning for your choice
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "targetService": "<service-id or 'none'>",
+  "confidence": <number between 0 and 1>,
+  "reasoning": "<brief explanation>"
+}`;
+}
+
+export function buildCandidateRoutingUserMessage(userMessage: string): string {
+  return `User request: "${userMessage}"
+
+Select the best service from the candidates. Respond with JSON only.`;
+}
+
+// ============================================================================
+// Multi-Tool Routing Prompt (for multi-service orchestration)
+// ============================================================================
+
+export function buildMultiToolRoutingPrompt(candidates: CandidateTool[]): string {
+  const candidateDescriptions = candidates
+    .map((c, i) => `${i + 1}. ${c.serviceId}: ${c.serviceName} - ${c.serviceDescription}`)
+    .join('\n');
+
+  return `You are Yukie, an intelligent assistant router. Your job is to determine which services should handle a user's request.
+
+The user's request may require one or multiple services. Analyze the request and determine:
+1. Which services are needed (can be one or more)
+2. Whether they should be called in parallel or sequentially
+3. Your confidence level
+
+Available services:
+${candidateDescriptions}
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "services": [
+    { "serviceId": "<service-id>", "purpose": "<what this service will do>" }
+  ],
+  "executionMode": "parallel" | "sequential",
+  "confidence": <number between 0 and 1>,
+  "reasoning": "<brief explanation>"
+}
+
+If no services match, respond with an empty services array.`;
+}
+
+export function buildMultiToolRoutingUserMessage(userMessage: string): string {
+  return `User request: "${userMessage}"
+
+Determine which services are needed and how they should be executed. Respond with JSON only.`;
 }
 
 // ============================================================================
