@@ -78,6 +78,16 @@ async function request<T>(
     headers,
   });
 
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new ApiError(
+      `Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`,
+      response.status
+    );
+  }
+
   const data = await response.json();
 
   if (!response.ok) {

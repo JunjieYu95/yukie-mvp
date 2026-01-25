@@ -19,7 +19,8 @@
     "clean": "rm -rf node_modules packages/*/node_modules apps/*/node_modules",
     "generate-token": "npx tsx scripts/generate-token.ts",
     "test-api": "npx tsx scripts/test-anthropic-api.ts",
-    "seed-habits": "npx tsx scripts/seed-habit-data.ts"
+    "seed-habits": "npx tsx scripts/seed-habit-data.ts",
+    "test-all": "npx tsx scripts/test-all-apis.ts"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

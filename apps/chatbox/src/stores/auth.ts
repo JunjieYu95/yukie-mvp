@@ -52,7 +52,6 @@ export const useAuthStore = defineStore('auth', () => {
   async function loginDev() {
     try {
       // Call the dev token endpoint
-      // Use /api which will be proxied to localhost:3000 by Vite
       const response = await fetch('/api/auth/dev-token', {
         method: 'POST',
         headers: {
@@ -64,8 +63,23 @@ export const useAuthStore = defineStore('auth', () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to generate token');
+        // Try to parse error as JSON, fallback to text
+        let errorMessage = 'Failed to generate token';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Check content type before parsing JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 200)}`);
       }
 
       const data = await response.json();

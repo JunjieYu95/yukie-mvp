@@ -105,6 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: body.message,
       auth,
       conversationId: body.conversationId,
+      model: body.model,
     });
 
     const timing = timer();
@@ -115,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       conversationId: body.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       serviceUsed: result.serviceUsed,
       actionInvoked: result.actionInvoked,
+      routingDetails: result.routingDetails,
     };
 
     logger.info('Chat message processed', {
