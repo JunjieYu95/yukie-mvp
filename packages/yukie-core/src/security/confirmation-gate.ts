@@ -191,7 +191,7 @@ export class ConfirmationGate {
    */
   cancelPlan(planId: string): number {
     let cancelled = 0;
-    for (const [id, request] of this.pendingConfirmations) {
+    for (const [_id, request] of this.pendingConfirmations) {
       if (request.planId === planId) {
         request.status = 'denied';
         this.moveToHistory(request);
@@ -209,7 +209,7 @@ export class ConfirmationGate {
     const now = Date.now();
     let cleaned = 0;
 
-    for (const [id, request] of this.pendingConfirmations) {
+    for (const [_id, request] of this.pendingConfirmations) {
       if (now > request.expiresAt) {
         request.status = 'expired';
         this.moveToHistory(request);

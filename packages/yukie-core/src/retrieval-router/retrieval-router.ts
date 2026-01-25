@@ -8,7 +8,7 @@
 
 import { createLogger, startTimer } from '../../../shared/observability/src/logger';
 import type { YNFPRoutingResult, AuthContext } from '../../../shared/protocol/src/types';
-import { getEnhancedRegistry, type EnhancedServiceEntry } from '../registry';
+import { getEnhancedRegistry, type EnhancedServiceEntry } from '../enhanced-registry';
 import { getKeywordExtractor, type KeywordExtractor } from './keyword-extractor';
 import { completeWithJSON } from '../llm/client';
 import type {
@@ -18,7 +18,6 @@ import type {
   RetrievalConfig,
   RetrievalResult,
   LLMRoutingResponse,
-  DEFAULT_RETRIEVAL_CONFIG,
 } from './types';
 
 const logger = createLogger('retrieval-router');

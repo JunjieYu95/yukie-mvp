@@ -8,14 +8,13 @@
 import { createLogger, startTimer } from '../../../shared/observability/src/logger';
 import type { AuthContext } from '../../../shared/protocol/src/types';
 import { completeWithJSON } from '../llm/client';
-import type { ToolSchema, RiskLevel } from '../registry/types';
+import type { ToolSchema, RiskLevel } from '../enhanced-registry/types';
 import type {
   Plan,
   PlanRequest,
   PlanResponse,
   ToolCall,
   LLMPlanningResult,
-  ExecutionMode,
   ValidationResult,
   ValidationError,
   ValidationWarning,

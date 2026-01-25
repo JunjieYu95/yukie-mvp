@@ -6,7 +6,7 @@
  */
 
 import { createLogger } from '../../../shared/observability/src/logger';
-import type { RiskLevel, ToolSchema } from '../registry/types';
+import type { RiskLevel, ToolSchema } from '../enhanced-registry/types';
 import type { ToolCall } from '../planner/types';
 
 const logger = createLogger('risk-classifier');

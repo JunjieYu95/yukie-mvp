@@ -9,7 +9,7 @@
 import { Planner, type Plan, type ToolCall } from '../packages/yukie-core/src/planner';
 import { Executor, ParameterValidator } from '../packages/yukie-core/src/executor';
 import { ResponseComposer } from '../packages/yukie-core/src/composer';
-import type { ToolSchema } from '../packages/yukie-core/src/registry/types';
+import type { ToolSchema } from '../packages/yukie-core/src/enhanced-registry/types';
 import type { AuthContext } from '../packages/shared/protocol/src/types';
 
 // ============================================================================

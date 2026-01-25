@@ -5,7 +5,7 @@
  */
 
 import type { YWAIPAction, AuthContext } from '../../../shared/protocol/src/types';
-import type { EnhancedServiceEntry, ToolSchema, RiskLevel } from '../registry/types';
+import type { EnhancedServiceEntry, ToolSchema, RiskLevel } from '../enhanced-registry/types';
 
 // ============================================================================
 // Routing Request/Response Types

@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from '../../../shared/observability/src/logger';
-import type { ToolSchema, ToolParameter } from '../registry/types';
+import type { ToolSchema, ToolParameter } from '../enhanced-registry/types';
 import type { ToolCall } from '../planner/types';
 
 const logger = createLogger('validator');
