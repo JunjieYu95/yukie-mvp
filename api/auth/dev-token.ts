@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // ============================================================================
 // Inline JWT utilities (to avoid module resolution issues in Vercel)

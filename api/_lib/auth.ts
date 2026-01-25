@@ -6,7 +6,7 @@
  * module resolution issues.
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 // ============================================================================
 // Types
