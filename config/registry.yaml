@@ -1,0 +1,171 @@
+# Yukie Service Registry
+# Version: 1.0
+# This file defines all available services that Yukie can route to.
+
+# Configuration options
+config:
+  # How long to cache service manifests (in seconds)
+  manifestCacheTTL: 600  # 10 minutes
+
+  # How often to refresh health status (in seconds)
+  healthCheckInterval: 60  # 1 minute
+
+  # Default timeout for service calls (in milliseconds)
+  defaultTimeout: 30000  # 30 seconds
+
+  # Maximum number of services to pass to LLM for routing
+  maxRoutingCandidates: 15
+
+# Service definitions
+services:
+  - id: habit-tracker
+    name: Habit Tracker
+    description: Track daily habits like waking up early, exercise, reading, meditation. Supports check-ins, streaks, and statistics.
+    baseUrl: ${HABIT_TRACKER_URL:-http://localhost:3001}
+    transport: http
+
+    # Authentication configuration
+    auth:
+      method: bearer-token
+      requiredScopes:
+        - habit:read
+        - habit:write
+        - habit:delete
+
+    # Endpoint configuration
+    endpoints:
+      health: /api/health
+      meta: /api/v1/meta
+      actions: /api/v1/actions
+      invoke: /api/v1/invoke
+
+    # Capabilities for retrieval-based routing
+    capabilities:
+      - habit check-in
+      - habit tracking
+      - streak calculation
+      - monthly statistics
+      - habit history query
+      - daily habit logging
+      - habit deletion
+
+    # Tags for capability indexing
+    tags:
+      - habit
+      - tracking
+      - personal
+      - health
+      - wellness
+      - daily-routine
+      - productivity
+
+    # Keywords for keyword-based retrieval
+    keywords:
+      - habit
+      - streak
+      - check-in
+      - checkin
+      - wake up
+      - wakeup
+      - exercise
+      - meditation
+      - reading
+      - routine
+      - daily
+      - track
+      - log
+      - record
+
+    # Risk classification for security
+    riskLevel: low
+
+    # Documentation URL (optional)
+    documentationUrl: null
+
+    # Owner notes
+    ownerNotes: Handles daily habit check-ins, streak tracking, and statistics
+
+    # Service status
+    enabled: true
+
+    # Priority for routing (higher = more preferred when multiple services match)
+    priority: 100
+
+# Future services (examples - currently disabled)
+#
+#  - id: calendar-service
+#    name: Calendar Service
+#    description: Manage calendar events, meetings, and reminders
+#    baseUrl: ${CALENDAR_SERVICE_URL:-http://localhost:3002}
+#    transport: http
+#    auth:
+#      method: bearer-token
+#      requiredScopes:
+#        - calendar:read
+#        - calendar:write
+#    endpoints:
+#      health: /api/health
+#      meta: /api/v1/meta
+#      actions: /api/v1/actions
+#      invoke: /api/v1/invoke
+#    capabilities:
+#      - create events
+#      - list events
+#      - update events
+#      - delete events
+#      - reminders
+#    tags:
+#      - calendar
+#      - events
+#      - meetings
+#      - reminders
+#      - scheduling
+#    keywords:
+#      - calendar
+#      - event
+#      - meeting
+#      - appointment
+#      - schedule
+#      - remind
+#      - reminder
+#    riskLevel: low
+#    enabled: false
+#    priority: 90
+#
+#  - id: note-service
+#    name: Note Service
+#    description: Create, search, and manage notes and documents
+#    baseUrl: ${NOTE_SERVICE_URL:-http://localhost:3003}
+#    transport: http
+#    auth:
+#      method: bearer-token
+#      requiredScopes:
+#        - note:read
+#        - note:write
+#        - note:delete
+#    endpoints:
+#      health: /api/health
+#      meta: /api/v1/meta
+#      actions: /api/v1/actions
+#      invoke: /api/v1/invoke
+#    capabilities:
+#      - create notes
+#      - search notes
+#      - update notes
+#      - delete notes
+#      - organize notes
+#    tags:
+#      - notes
+#      - documents
+#      - writing
+#      - organization
+#    keywords:
+#      - note
+#      - write
+#      - document
+#      - save
+#      - remember
+#      - memo
+#    riskLevel: low
+#    enabled: false
+#    priority: 80

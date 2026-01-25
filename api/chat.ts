@@ -1,97 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
+import { authenticateRequest, hasScope, type AuthContext } from './_lib/auth';
+import {
+  processChatMessage,
+  initializeRegistry,
+  createLogger,
+} from './_lib/yukie-core';
+
+const logger = createLogger('api-chat');
+
+// Flag to control routing - can be toggled for debugging
+const ENABLE_ROUTING = process.env.ENABLE_ROUTING !== 'false';
 
 // ============================================================================
-// Inline Auth Utilities
-// ============================================================================
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET environment variable is not set');
-  }
-  return secret;
-}
-
-function base64UrlDecode(data: string): string {
-  let padded = data.replace(/-/g, '+').replace(/_/g, '/');
-  while (padded.length % 4) {
-    padded += '=';
-  }
-  return Buffer.from(padded, 'base64').toString('utf8');
-}
-
-function hmacVerify(message: string, signature: string, secret: string): boolean {
-  const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(message);
-  const expectedSignature = hmac.digest('base64url');
-  return signature === expectedSignature;
-}
-
-interface JWTPayload {
-  sub: string;
-  scopes: string[];
-  iat: number;
-  exp: number;
-}
-
-interface AuthContext {
-  userId: string;
-  scopes: string[];
-}
-
-function validateToken(token: string): { valid: boolean; payload?: JWTPayload; error?: string } {
-  try {
-    const secret = getJwtSecret();
-    const parts = token.split('.');
-
-    if (parts.length !== 3) {
-      return { valid: false, error: 'Invalid token format' };
-    }
-
-    const [headerEncoded, payloadEncoded, signature] = parts;
-    const message = `${headerEncoded}.${payloadEncoded}`;
-
-    if (!hmacVerify(message, signature, secret)) {
-      return { valid: false, error: 'Invalid signature' };
-    }
-
-    const payload = JSON.parse(base64UrlDecode(payloadEncoded)) as JWTPayload;
-
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) {
-      return { valid: false, error: 'Token expired' };
-    }
-
-    return { valid: true, payload };
-  } catch (error) {
-    return { valid: false, error: `Token validation failed: ${error}` };
-  }
-}
-
-function authenticateRequest(authHeader?: string): { success: boolean; context?: AuthContext; error?: string } {
-  if (!authHeader?.startsWith('Bearer ')) {
-    return { success: false, error: 'No bearer token provided' };
-  }
-
-  const token = authHeader.slice(7);
-  const result = validateToken(token);
-
-  if (!result.valid || !result.payload) {
-    return { success: false, error: result.error || 'Invalid token' };
-  }
-
-  return {
-    success: true,
-    context: {
-      userId: result.payload.sub,
-      scopes: result.payload.scopes,
-    },
-  };
-}
-
-// ============================================================================
-// Anthropic API Client
+// Fallback Direct LLM Call (when routing is disabled)
 // ============================================================================
 
 interface ChatMessage {
@@ -99,7 +20,7 @@ interface ChatMessage {
   content: string;
 }
 
-async function callAnthropic(messages: ChatMessage[], model?: string): Promise<string> {
+async function callAnthropicDirect(messages: ChatMessage[], model?: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY environment variable is not set');
@@ -130,7 +51,7 @@ async function callAnthropic(messages: ChatMessage[], model?: string): Promise<s
     throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await response.json() as { content?: Array<{ text?: string }> };
+  const data = (await response.json()) as { content?: Array<{ text?: string }> };
   return data.content?.[0]?.text || 'I could not generate a response.';
 }
 
@@ -142,6 +63,17 @@ interface ChatRequest {
   message: string;
   conversationId?: string;
   model?: string;
+}
+
+// Initialize registry on cold start
+let registryInitialized = false;
+
+function ensureRegistryInitialized(): void {
+  if (!registryInitialized) {
+    initializeRegistry();
+    registryInitialized = true;
+    logger.info('Registry initialized');
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -164,8 +96,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Generate request ID
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
   // Authenticate
-  const authResult = authenticateRequest(req.headers.authorization);
+  const authResult = authenticateRequest(
+    req.headers.authorization,
+    requestId
+  );
   if (!authResult.success || !authResult.context) {
     res.status(401).json({
       error: 'Unauthorized',
@@ -174,8 +112,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  const auth: AuthContext = authResult.context;
+
   // Check for chat scope
-  if (!authResult.context.scopes.includes('yukie:chat')) {
+  if (!hasScope(auth, 'yukie:chat')) {
     res.status(403).json({
       error: 'Forbidden',
       message: 'Missing required scope: yukie:chat',
@@ -195,21 +135,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  const conversationId =
+    body.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
   try {
-    // Call Anthropic API
-    const response = await callAnthropic(
-      [{ role: 'user', content: body.message }],
-      body.model
-    );
+    if (ENABLE_ROUTING) {
+      // Initialize registry if needed
+      ensureRegistryInitialized();
 
-    const conversationId = body.conversationId || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // Use the full routing system
+      logger.info('Processing chat with routing', { userId: auth.userId, requestId });
 
-    res.status(200).json({
-      response,
-      conversationId,
-    });
+      const result = await processChatMessage({
+        message: body.message,
+        auth,
+        conversationId,
+        model: body.model,
+      });
+
+      logger.info('Chat processed', {
+        userId: auth.userId,
+        requestId,
+        serviceUsed: result.serviceUsed,
+        routingConfidence: result.routingConfidence,
+      });
+
+      res.status(200).json({
+        response: result.response,
+        conversationId,
+        serviceUsed: result.serviceUsed,
+        actionInvoked: result.actionInvoked,
+        routingDetails: result.routingDetails,
+      });
+    } else {
+      // Fallback to direct LLM call (routing disabled)
+      logger.info('Processing chat without routing (fallback mode)', { userId: auth.userId, requestId });
+
+      const response = await callAnthropicDirect(
+        [{ role: 'user', content: body.message }],
+        body.model
+      );
+
+      res.status(200).json({
+        response,
+        conversationId,
+      });
+    }
   } catch (error) {
-    console.error('Chat error:', error);
+    logger.error('Chat error', error, { userId: auth.userId, requestId });
     res.status(500).json({
       error: 'Internal Server Error',
       message: error instanceof Error ? error.message : 'An error occurred while processing your message',
