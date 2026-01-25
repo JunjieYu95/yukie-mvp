@@ -6,7 +6,19 @@ import {
   createLogger,
 } from './_lib/yukie-core';
 
-const logger = createLogger('api-chat');
+// Wrap logger creation in try-catch to prevent cold start crashes
+let logger: ReturnType<typeof createLogger>;
+try {
+  logger = createLogger('api-chat');
+} catch (e) {
+  // Fallback logger if createLogger fails
+  logger = {
+    info: (...args: unknown[]) => console.log('[INFO]', ...args),
+    warn: (...args: unknown[]) => console.warn('[WARN]', ...args),
+    error: (...args: unknown[]) => console.error('[ERROR]', ...args),
+    debug: (...args: unknown[]) => console.log('[DEBUG]', ...args),
+  } as ReturnType<typeof createLogger>;
+}
 
 // Flag to control routing - can be toggled for debugging
 const ENABLE_ROUTING = process.env.ENABLE_ROUTING !== 'false';
@@ -141,17 +153,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (ENABLE_ROUTING) {
       // Initialize registry if needed
-      ensureRegistryInitialized();
+      try {
+        ensureRegistryInitialized();
+      } catch (initError) {
+        console.error('[CHAT] Registry initialization failed:', initError);
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Registry initialization failed: ' + (initError instanceof Error ? initError.message : String(initError)),
+          stage: 'registry_init',
+        });
+        return;
+      }
 
       // Use the full routing system
       logger.info('Processing chat with routing', { userId: auth.userId, requestId });
 
-      const result = await processChatMessage({
-        message: body.message,
-        auth,
-        conversationId,
-        model: body.model,
-      });
+      let result;
+      try {
+        result = await processChatMessage({
+          message: body.message,
+          auth,
+          conversationId,
+          model: body.model,
+        });
+      } catch (processError) {
+        console.error('[CHAT] processChatMessage failed:', processError);
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Chat processing failed: ' + (processError instanceof Error ? processError.message : String(processError)),
+          stage: 'process_chat',
+        });
+        return;
+      }
 
       logger.info('Chat processed', {
         userId: auth.userId,
@@ -182,10 +215,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
   } catch (error) {
+    console.error('[CHAT] Unhandled error:', error);
     logger.error('Chat error', error, { userId: auth.userId, requestId });
     res.status(500).json({
       error: 'Internal Server Error',
       message: error instanceof Error ? error.message : 'An error occurred while processing your message',
+      stage: 'unknown',
     });
   }
 }
