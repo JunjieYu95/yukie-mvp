@@ -1,0 +1,20 @@
+{
+  "services": [
+    {
+      "id": "habit-tracker",
+      "name": "Habit Tracker",
+      "description": "Track daily habits like waking up early, exercise, reading, meditation. Supports check-ins, streaks, and statistics.",
+      "baseUrl": "${HABIT_TRACKER_URL:-http://localhost:3001}",
+      "capabilities": [
+        "habit check-in",
+        "habit tracking",
+        "streak calculation",
+        "monthly statistics",
+        "habit history query"
+      ],
+      "scopes": ["habit:read", "habit:write", "habit:delete"],
+      "healthEndpoint": "/api/health",
+      "enabled": true
+    }
+  ]
+}
