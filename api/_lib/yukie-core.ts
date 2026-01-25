@@ -33,7 +33,7 @@ export type {
   LLMCompletionOptions,
   LLMCompletionResult,
   HealthResponse,
-} from '../../packages/shared/protocol/src/types';
+} from '../../packages/shared/protocol/src/types.js';
 
 // Re-export logger utilities
 export {
@@ -41,8 +41,8 @@ export {
   startTimer,
   Logger,
   recordMetric,
-} from '../../packages/shared/observability/src/logger';
-export type { LogLevel, TimingResult, Metric } from '../../packages/shared/observability/src/logger';
+} from '../../packages/shared/observability/src/logger.js';
+export type { LogLevel, TimingResult, Metric } from '../../packages/shared/observability/src/logger.js';
 
 // Re-export LLM client
 export {
@@ -50,8 +50,8 @@ export {
   resetLLMClient,
   complete,
   completeWithJSON,
-} from '../../packages/yukie-core/src/llm/client';
-export type { LLMClient } from '../../packages/yukie-core/src/llm/client';
+} from '../../packages/yukie-core/src/llm/client.js';
+export type { LLMClient } from '../../packages/yukie-core/src/llm/client.js';
 
 // Re-export prompts
 export {
@@ -60,7 +60,7 @@ export {
   buildFallbackPrompt,
   buildResponseFormattingPrompt,
   buildConversationSummaryPrompt,
-} from '../../packages/yukie-core/src/llm/prompts';
+} from '../../packages/yukie-core/src/llm/prompts.js';
 
 // Re-export original registry (registry.ts file)
 export {
@@ -68,7 +68,7 @@ export {
   resetRegistry,
   getDefaultServicesConfig,
   initializeRegistry,
-} from '../../packages/yukie-core/src/registry';
+} from '../../packages/yukie-core/src/registry.js';
 
 // Re-export original router (router.ts file)
 export {
@@ -77,9 +77,9 @@ export {
   formatResponse,
   generateFallbackResponse,
   processChatMessage,
-} from '../../packages/yukie-core/src/router';
+} from '../../packages/yukie-core/src/router.js';
 export type {
   InvokeServiceOptions,
   ChatFlowOptions,
   ChatFlowResult,
-} from '../../packages/yukie-core/src/router';
+} from '../../packages/yukie-core/src/router.js';
