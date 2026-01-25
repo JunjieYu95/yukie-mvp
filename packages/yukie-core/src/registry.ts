@@ -70,7 +70,7 @@ class ServiceRegistry {
         logger.warn('Failed to fetch service meta', { serviceId, status: response.status });
         return null;
       }
-      return await response.json();
+      return await response.json() as YWAIPServiceMeta;
     } catch (error) {
       logger.error('Error fetching service meta', error, { serviceId });
       return null;
@@ -90,7 +90,7 @@ class ServiceRegistry {
         logger.warn('Failed to fetch service actions', { serviceId, status: response.status });
         return null;
       }
-      return await response.json();
+      return await response.json() as YWAIPActionsResponse;
     } catch (error) {
       logger.error('Error fetching service actions', error, { serviceId });
       return null;
@@ -118,7 +118,7 @@ class ServiceRegistry {
       }
 
       try {
-        return await response.json();
+        return await response.json() as HealthResponse;
       } catch {
         return { ok, service: serviceId };
       }

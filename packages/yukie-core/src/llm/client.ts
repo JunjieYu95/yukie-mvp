@@ -4,6 +4,28 @@ import { createLogger } from '../../../shared/observability/src/logger';
 const logger = createLogger('llm-client');
 
 // ============================================================================
+// API Response Types
+// ============================================================================
+
+interface AnthropicResponse {
+  content?: Array<{ text?: string }>;
+  model?: string;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+}
+
+interface OpenAIResponse {
+  choices?: Array<{ message?: { content?: string } }>;
+  model?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+}
+
+// ============================================================================
 // LLM Client Interface
 // ============================================================================
 
@@ -79,7 +101,7 @@ class AnthropicClient implements LLMClient {
       throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as AnthropicResponse;
 
     const content = data.content?.[0]?.text || '';
 
@@ -91,7 +113,7 @@ class AnthropicClient implements LLMClient {
 
     return {
       content,
-      model: data.model,
+      model: data.model || '',
       usage: {
         inputTokens: data.usage?.input_tokens || 0,
         outputTokens: data.usage?.output_tokens || 0,
@@ -161,7 +183,7 @@ class OpenAIClient implements LLMClient {
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as OpenAIResponse;
 
     const content = data.choices?.[0]?.message?.content || '';
 
@@ -173,7 +195,7 @@ class OpenAIClient implements LLMClient {
 
     return {
       content,
-      model: data.model,
+      model: data.model || '',
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0,

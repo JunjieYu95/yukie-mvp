@@ -147,7 +147,7 @@ export async function invokeService(options: InvokeServiceOptions): Promise<YWAI
       };
     }
 
-    const result: YWAIPInvokeResponse = await response.json();
+    const result = await response.json() as YWAIPInvokeResponse;
 
     logger.info('Service invocation complete', {
       serviceId,

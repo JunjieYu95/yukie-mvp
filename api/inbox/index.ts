@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { AuthContext } from '../../packages/shared/protocol/src/types';
 import { authenticateRequest } from '../../packages/shared/auth/src/auth';
-import { getJobsByUser, getInboxStats } from '../../packages/yukie-core/src/inbox';
+import { getJobsByUser } from '../../packages/yukie-core/src/inbox';
 import { canAccessInbox, checkRateLimit } from '../../packages/yukie-core/src/policy';
 import { createLogger } from '../../packages/shared/observability/src/logger';
 
