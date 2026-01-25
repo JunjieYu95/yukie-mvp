@@ -5,7 +5,7 @@
  * Supports background refresh and version tracking.
  */
 
-import { createLogger, startTimer } from '../../../shared/observability/src/logger';
+import { createLogger } from '../../../shared/observability/src/logger';
 import type { ToolManifest, ToolSchema } from './types';
 import type { YWAIPActionsResponse } from '../../../shared/protocol/src/types';
 

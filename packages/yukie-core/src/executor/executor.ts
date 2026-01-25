@@ -7,7 +7,7 @@
 
 import { createLogger, startTimer } from '../../../shared/observability/src/logger';
 import type { AuthContext, YWAIPInvokeRequest, YWAIPInvokeResponse } from '../../../shared/protocol/src/types';
-import { getEnhancedRegistry } from '../registry';
+import { getEnhancedRegistry } from '../enhanced-registry';
 import type {
   Plan,
   ToolCall,
@@ -216,7 +216,7 @@ export class Executor {
         };
       }
 
-      const result: YWAIPInvokeResponse = await response.json();
+      const result = await response.json() as YWAIPInvokeResponse;
 
       logger.debug('Tool call completed', {
         callId: call.id,

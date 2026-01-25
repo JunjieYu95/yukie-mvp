@@ -5,7 +5,7 @@
  */
 
 import type { AuthContext } from '../../../shared/protocol/src/types';
-import type { ToolSchema, RiskLevel } from '../registry/types';
+import type { ToolSchema, RiskLevel } from '../enhanced-registry/types';
 
 // ============================================================================
 // Tool Call Types

@@ -15,7 +15,6 @@ import type {
   ServiceDefinition,
   EnhancedServiceEntry,
   ToolManifest,
-  ToolSchema,
   RegistryConfig,
   RegistryYAML,
   ServiceHealthStatus,
@@ -384,7 +383,7 @@ export class EnhancedServiceRegistry {
         return null;
       }
 
-      return await response.json();
+      return await response.json() as YWAIPServiceMeta;
     } catch (error) {
       logger.error('Error fetching service meta', error, { serviceId });
       return null;
@@ -423,7 +422,7 @@ export class EnhancedServiceRegistry {
         return null;
       }
 
-      const data: YWAIPActionsResponse = await response.json();
+      const data = await response.json() as YWAIPActionsResponse;
       const timing = timer();
 
       // Cache the manifest
@@ -515,7 +514,7 @@ export class EnhancedServiceRegistry {
 
       let version: string | undefined;
       try {
-        const data: HealthResponse = await response.json();
+        const data = await response.json() as HealthResponse;
         version = data.version;
       } catch {
         // Ignore JSON parse errors

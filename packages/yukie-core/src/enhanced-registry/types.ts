@@ -5,7 +5,7 @@
  * capability indexing, and YAML configuration support.
  */
 
-import type { YWAIPAction, YWAIPServiceMeta } from '../../../shared/protocol/src/types';
+// Note: Types are self-contained; no external imports needed
 
 // ============================================================================
 // Service Definition Types (from YAML config)

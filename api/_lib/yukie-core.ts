@@ -4,9 +4,11 @@
  * This file re-exports yukie-core functionality for use in Vercel serverless functions.
  * Uses relative imports to ensure proper bundling.
  *
- * NOTE: Only exports essential functions to avoid module resolution conflicts.
- * The new enhanced registry/router modules are available but not exported here
- * to prevent conflicts with existing files.
+ * Module structure:
+ * - registry.ts: Original service registry (basic)
+ * - router.ts: Original LLM-based router (basic)
+ * - enhanced-registry/: Enhanced registry with capability indexing (Phase 2)
+ * - retrieval-router/: Retrieval-based routing with keyword extraction (Phase 3)
  */
 
 // Re-export types from protocol

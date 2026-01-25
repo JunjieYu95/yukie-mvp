@@ -171,7 +171,7 @@ export class InputSanitizer {
   }
 
   private sanitizeString(
-    key: string,
+    _key: string,
     value: string
   ): { value: string; warning?: string; blocked?: boolean; reason?: string; pattern?: string } {
     let sanitized = value;
