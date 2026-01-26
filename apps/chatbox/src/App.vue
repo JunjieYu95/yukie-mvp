@@ -18,11 +18,27 @@ const showContacts = ref(false);
 const loginError = ref<string | null>(null);
 const showModelDropdown = ref(false);
 const isCompact = ref(false);
+const showInstallBanner = ref(false);
+const installMode = ref<'ios' | 'prompt' | null>(null);
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const activeContact = computed(() => contactsStore.activeContact);
 
 const mediaQuery = ref<MediaQueryList | null>(null);
+const installPrompt = ref<BeforeInstallPromptEvent | null>(null);
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+function isStandaloneMode() {
+  return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+}
+
+function isIOSDevice() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+}
 
 function updateCompactState() {
   if (!mediaQuery.value) return;
@@ -37,10 +53,23 @@ onMounted(() => {
   mediaQuery.value = window.matchMedia('(max-width: 980px)');
   updateCompactState();
   mediaQuery.value.addEventListener('change', updateCompactState);
+
+  const dismissed = localStorage.getItem('yukie_install_dismissed') === '1';
+  if (!dismissed && !isStandaloneMode()) {
+    if (isIOSDevice()) {
+      installMode.value = 'ios';
+      showInstallBanner.value = true;
+    }
+  }
+
+  window.addEventListener('beforeinstallprompt', handleInstallPrompt as EventListener);
+  window.addEventListener('appinstalled', handleAppInstalled);
 });
 
 onBeforeUnmount(() => {
   mediaQuery.value?.removeEventListener('change', updateCompactState);
+  window.removeEventListener('beforeinstallprompt', handleInstallPrompt as EventListener);
+  window.removeEventListener('appinstalled', handleAppInstalled);
 });
 
 async function handleLogin() {
@@ -69,6 +98,36 @@ function handleSelectContact(contactId: string) {
   if (isCompact.value) {
     showContacts.value = false;
   }
+}
+
+function handleInstallPrompt(event: Event) {
+  event.preventDefault();
+  installPrompt.value = event as BeforeInstallPromptEvent;
+  if (!localStorage.getItem('yukie_install_dismissed')) {
+    installMode.value = 'prompt';
+    showInstallBanner.value = true;
+  }
+}
+
+async function handleInstallClick() {
+  if (!installPrompt.value) return;
+  await installPrompt.value.prompt();
+  const choice = await installPrompt.value.userChoice;
+  showInstallBanner.value = false;
+  installPrompt.value = null;
+  if (choice.outcome === 'dismissed') {
+    localStorage.setItem('yukie_install_dismissed', '1');
+  }
+}
+
+function dismissInstallBanner() {
+  showInstallBanner.value = false;
+  localStorage.setItem('yukie_install_dismissed', '1');
+}
+
+function handleAppInstalled() {
+  showInstallBanner.value = false;
+  localStorage.setItem('yukie_install_dismissed', '1');
 }
 </script>
 
@@ -140,6 +199,20 @@ function handleSelectContact(contactId: string) {
         </button>
       </div>
     </header>
+
+    <div v-if="showInstallBanner" class="install-banner">
+      <div class="install-content">
+        <strong>Install Yukie</strong>
+        <span v-if="installMode === 'ios'">Tap Share → Add to Home Screen for the full app experience.</span>
+        <span v-else>Add Yukie to your home screen for a full-screen experience.</span>
+      </div>
+      <div class="install-actions">
+        <button v-if="installMode === 'prompt'" class="install-button" @click="handleInstallClick">
+          Install
+        </button>
+        <button class="install-dismiss" @click="dismissInstallBanner">Not now</button>
+      </div>
+    </div>
 
     <main class="main-grid" :class="{ compact: isCompact }">
       <aside class="contacts-panel" :class="{ open: showContacts || !isCompact }">
@@ -408,6 +481,48 @@ function handleSelectContact(contactId: string) {
   min-height: 0;
 }
 
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.install-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.install-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.install-button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #22c55e;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.install-dismiss {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 250, 252, 0.4);
+  background: transparent;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
 .main-grid.compact {
   grid-template-columns: 1fr;
 }
@@ -548,6 +663,10 @@ function handleSelectContact(contactId: string) {
 }
 
 @media (max-width: 980px) {
+  .install-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .contacts-panel {
     position: fixed;
     top: 72px;
