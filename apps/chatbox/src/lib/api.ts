@@ -64,8 +64,10 @@ async function request<T>(
   options: RequestInit = {},
   token?: string
 ): Promise<T> {
+  const utcOffsetMinutes = -new Date().getTimezoneOffset();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Yukie-UTC-Offset-Minutes': String(utcOffsetMinutes),
     ...(options.headers as Record<string, string>),
   };
 

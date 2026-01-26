@@ -112,6 +112,7 @@ export async function invokeService(options: InvokeServiceOptions): Promise<YWAI
         userId: auth.userId,
         requestId: auth.requestId,
         scopes: auth.scopes,
+        utcOffsetMinutes: auth.utcOffsetMinutes,
       },
     };
 
@@ -122,6 +123,9 @@ export async function invokeService(options: InvokeServiceOptions): Promise<YWAI
         'X-Yukie-User-Id': auth.userId,
         'X-Yukie-Scopes': auth.scopes.join(','),
         'X-Yukie-Request-Id': auth.requestId || '',
+        ...(auth.utcOffsetMinutes !== undefined
+          ? { 'X-Yukie-UTC-Offset-Minutes': String(auth.utcOffsetMinutes) }
+          : {}),
       },
       body: JSON.stringify(invokeRequest),
     });

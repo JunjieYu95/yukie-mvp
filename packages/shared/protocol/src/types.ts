@@ -46,6 +46,7 @@ export interface YWAIPContext {
   conversationId?: string;
   requestId?: string;
   scopes?: string[];
+  utcOffsetMinutes?: number;
 }
 
 export interface YWAIPInvokeResponse {
@@ -169,6 +170,7 @@ export interface AuthContext {
   userId: string;
   scopes: string[];
   requestId?: string;
+  utcOffsetMinutes?: number;
 }
 
 // ============================================================================

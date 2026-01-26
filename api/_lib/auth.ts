@@ -23,6 +23,7 @@ export interface AuthContext {
   userId: string;
   scopes: string[];
   requestId?: string;
+  utcOffsetMinutes?: number;
 }
 
 export interface AuthResult {

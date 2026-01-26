@@ -125,6 +125,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const auth: AuthContext = authResult.context;
+  const utcOffsetHeader = req.headers['x-yukie-utc-offset-minutes'];
+  const utcOffsetMinutes = Array.isArray(utcOffsetHeader)
+    ? parseInt(utcOffsetHeader[0] || '', 10)
+    : parseInt(utcOffsetHeader || '', 10);
+  if (Number.isFinite(utcOffsetMinutes)) {
+    auth.utcOffsetMinutes = utcOffsetMinutes;
+  }
 
   // Check for chat scope
   if (!hasScope(auth, 'yukie:chat')) {
