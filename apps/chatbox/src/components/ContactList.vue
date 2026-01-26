@@ -65,7 +65,8 @@ function timeLabel(date?: Date) {
         @click="emit('select', contact.id)"
       >
         <div class="avatar" :style="{ background: contact.accent || '#0f766e' }">
-          {{ initials(contact.name) }}
+          <img v-if="contact.avatarUrl" :src="contact.avatarUrl" :alt="contact.name" />
+          <span v-else>{{ initials(contact.name) }}</span>
           <span class="status" :class="contact.status"></span>
         </div>
         <div class="contact-main">
@@ -161,6 +162,13 @@ function timeLabel(date?: Date) {
   font-weight: 600;
   position: relative;
   font-size: 14px;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .status {

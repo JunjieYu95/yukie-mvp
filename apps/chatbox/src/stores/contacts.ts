@@ -15,6 +15,7 @@ export interface Contact {
   unreadCount: number;
   pinned?: boolean;
   accent?: string;
+  avatarUrl?: string;
 }
 
 const seedContacts: Contact[] = [
@@ -27,6 +28,7 @@ const seedContacts: Contact[] = [
     unreadCount: 0,
     pinned: true,
     accent: '#0f766e',
+    avatarUrl: '/icons/yukie-avatar.png',
   },
   {
     id: 'habit-tracker',
