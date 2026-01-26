@@ -23,7 +23,9 @@
       "@yukie-core/*": ["packages/yukie-core/src/*"],
       "@shared/protocol": ["packages/shared/protocol/src/types"],
       "@shared/auth": ["packages/shared/auth/src/auth"],
-      "@shared/observability": ["packages/shared/observability/src/logger"]
+      "@shared/observability": ["packages/shared/observability/src/logger"],
+      "@shared/mcp-server": ["packages/shared/mcp-server/src/index"],
+      "@shared/mcp-client": ["packages/shared/mcp-client/src/index"]
     }
   },
   "include": [

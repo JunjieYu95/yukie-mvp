@@ -16,8 +16,12 @@ import cors from 'cors';
 import type { AuthContext } from '../../shared/protocol/src/types';
 import { authenticateRequest } from '../../shared/auth/src/auth';
 import { initializeRegistry } from './registry';
+import { initializeMCPRegistry } from './mcp-registry';
 import { startRateLimitCleanup, stopRateLimitCleanup } from './policy';
 import { startInboxCleanup, stopInboxCleanup } from './inbox';
+
+// Use MCP protocol if environment variable is set
+const USE_MCP = process.env.USE_MCP_PROTOCOL === 'true';
 import { setupChatRoutes } from './routes/chat';
 import { setupInboxRoutes } from './routes/inbox';
 import { setupHealthRoutes } from './routes/health';
@@ -188,7 +192,13 @@ export async function startServer(options: ServerOptions = {}): Promise<{
   const port = options.port || parseInt(process.env.PORT || '3000', 10);
 
   // Initialize components
-  initializeRegistry();
+  if (USE_MCP) {
+    logger.info('Using MCP protocol for service communication');
+    initializeMCPRegistry();
+  } else {
+    logger.info('Using YWAIP protocol for service communication');
+    initializeRegistry();
+  }
   startRateLimitCleanup();
   startInboxCleanup();
 
