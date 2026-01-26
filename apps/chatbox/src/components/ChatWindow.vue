@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useChatStore } from '../stores/chat';
 import MessageList from './MessageList.vue';
 import InputBar from './InputBar.vue';
+import type { Contact } from '../stores/contacts';
 
 const chatStore = useChatStore();
 const messagesContainer = ref<HTMLElement | null>(null);
+
+const props = defineProps<{
+  contact: Contact | null;
+  compact?: boolean;
+}>();
+
+const emit = defineEmits<{
+  back: [];
+}>();
+
+const isServiceContact = computed(() => props.contact?.type === 'service');
 
 // Auto-scroll to bottom when new messages arrive
 watch(
@@ -30,14 +42,27 @@ function handleClear() {
 <template>
   <div class="chat-window">
     <div class="chat-header">
-      <h2>Chat</h2>
-      <button
-        v-if="chatStore.messages.length > 0"
-        class="clear-button"
-        @click="handleClear"
-      >
-        Clear
-      </button>
+      <div class="header-left">
+        <button v-if="compact" class="back-button" @click="emit('back')">
+          ←
+        </button>
+        <div class="contact-meta">
+          <div class="contact-title">
+            <span class="contact-name">{{ props.contact?.name || 'Chat' }}</span>
+            <span class="status-dot" :class="props.contact?.status || 'offline'"></span>
+          </div>
+          <span class="contact-subtitle">{{ props.contact?.subtitle || 'Personal assistant' }}</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button
+          v-if="chatStore.messages.length > 0"
+          class="clear-button"
+          @click="handleClear"
+        >
+          Clear
+        </button>
+      </div>
     </div>
 
     <div ref="messagesContainer" class="messages-container">
@@ -45,17 +70,18 @@ function handleClear() {
 
       <div v-if="chatStore.messages.length === 0" class="empty-state">
         <div class="empty-icon">💬</div>
-        <h3>Start a conversation</h3>
-        <p>Ask me anything! Try:</p>
-        <ul class="suggestions">
+        <h3>{{ isServiceContact ? 'Direct chat coming soon' : 'Start a conversation' }}</h3>
+        <p v-if="!isServiceContact">Ask me anything! Try:</p>
+        <p v-else>Yukie will soon let you chat with services directly.</p>
+        <ul v-if="!isServiceContact" class="suggestions">
           <li @click="handleSend('Check me in for today')">
-            "Check me in for today"
+            Check me in for today
           </li>
-          <li @click="handleSend('What\'s my current streak?')">
-            "What's my current streak?"
+          <li @click="handleSend('What\\'s my current streak?')">
+            What's my current streak?
           </li>
           <li @click="handleSend('How many days this month?')">
-            "How many days this month?"
+            How many days this month?
           </li>
         </ul>
       </div>
@@ -93,7 +119,7 @@ function handleClear() {
     </div>
 
     <InputBar
-      :disabled="chatStore.isLoading"
+      :disabled="chatStore.isLoading || isServiceContact"
       @send="handleSend"
     />
   </div>
@@ -104,8 +130,8 @@ function handleClear() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-right: 1px solid #e0e0e0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
 }
 
 .chat-header {
@@ -113,36 +139,90 @@ function handleClear() {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(120deg, rgba(15, 118, 110, 0.08), rgba(249, 115, 22, 0.08));
 }
 
-.chat-header h2 {
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.contact-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contact-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.contact-name {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--ink);
+}
+
+.contact-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.status-dot.online {
+  background: #22c55e;
+}
+
+.status-dot.away {
+  background: #f59e0b;
+}
+
+.status-dot.offline {
+  background: #94a3b8;
 }
 
 .clear-button {
   padding: 6px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
-  color: #666;
+  background: var(--panel);
+  color: var(--muted);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .clear-button:hover {
-  background: #f5f5f5;
-  color: #333;
+  background: rgba(15, 118, 110, 0.08);
+  color: var(--ink);
 }
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
+  background: var(--surface);
 }
 
 .empty-state {
@@ -152,7 +232,7 @@ function handleClear() {
   justify-content: center;
   height: 100%;
   text-align: center;
-  color: #666;
+  color: var(--muted);
 }
 
 .empty-icon {
@@ -163,7 +243,7 @@ function handleClear() {
 .empty-state h3 {
   margin: 0 0 8px;
   font-size: 18px;
-  color: #333;
+  color: var(--ink);
 }
 
 .empty-state p {
@@ -179,16 +259,16 @@ function handleClear() {
 .suggestions li {
   padding: 10px 16px;
   margin: 8px 0;
-  background: #f5f5f5;
+  background: #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
-  color: #333;
+  color: var(--ink);
 }
 
 .suggestions li:hover {
-  background: #6366f1;
+  background: #0f766e;
   color: #fff;
 }
 
@@ -215,7 +295,7 @@ function handleClear() {
 .loading-dot {
   width: 8px;
   height: 8px;
-  background: #6366f1;
+  background: #0f766e;
   border-radius: 50%;
   animation: bounce 1.4s infinite ease-in-out both;
 }
@@ -234,7 +314,7 @@ function handleClear() {
 
 .status-text {
   font-size: 13px;
-  color: #666;
+  color: var(--muted);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -243,13 +323,13 @@ function handleClear() {
 }
 
 .status-text strong {
-  color: #6366f1;
+  color: #0f766e;
   font-weight: 600;
 }
 
 .action-name {
   font-size: 11px;
-  color: #999;
+  color: #94a3b8;
   font-style: italic;
   margin-left: 4px;
 }
@@ -265,8 +345,8 @@ function handleClear() {
 
 .error-banner {
   padding: 12px 20px;
-  background: #fef2f2;
-  color: #dc2626;
+  background: #fee2e2;
+  color: #b91c1c;
   font-size: 14px;
   border-top: 1px solid #fecaca;
 }

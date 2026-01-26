@@ -1,20 +1,47 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useAuthStore } from './stores/auth';
 import { useSettingsStore } from './stores/settings';
+import { useContactsStore } from './stores/contacts';
+import { useChatStore } from './stores/chat';
 import ChatWindow from './components/ChatWindow.vue';
+import ContactList from './components/ContactList.vue';
 import InboxPanel from './components/InboxPanel.vue';
 
 const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
+const contactsStore = useContactsStore();
+const chatStore = useChatStore();
+
 const showInbox = ref(false);
+const showContacts = ref(false);
 const loginError = ref<string | null>(null);
 const showModelDropdown = ref(false);
+const isCompact = ref(false);
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
+const activeContact = computed(() => contactsStore.activeContact);
 
-// Initialize auth on mount
-authStore.initialize();
+const mediaQuery = ref<MediaQueryList | null>(null);
+
+function updateCompactState() {
+  if (!mediaQuery.value) return;
+  isCompact.value = mediaQuery.value.matches;
+  if (!isCompact.value) {
+    showContacts.value = false;
+  }
+}
+
+onMounted(() => {
+  authStore.initialize();
+  mediaQuery.value = window.matchMedia('(max-width: 980px)');
+  updateCompactState();
+  mediaQuery.value.addEventListener('change', updateCompactState);
+});
+
+onBeforeUnmount(() => {
+  mediaQuery.value?.removeEventListener('change', updateCompactState);
+});
 
 async function handleLogin() {
   loginError.value = null;
@@ -36,26 +63,39 @@ function handleModelButtonBlur() {
     showModelDropdown.value = false;
   }, 200);
 }
+
+function handleSelectContact(contactId: string) {
+  chatStore.setActiveContact(contactId);
+  if (isCompact.value) {
+    showContacts.value = false;
+  }
+}
 </script>
 
 <template>
-  <div class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="header-left">
-        <h1 class="app-title">Yukie</h1>
-        <span class="app-subtitle">Your AI Assistant</span>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="brand">
+        <button v-if="isCompact" class="mobile-toggle" @click="showContacts = true">
+          ☰
+        </button>
+        <div class="brand-mark">Y</div>
+        <div>
+          <h1 class="brand-title">Yukie</h1>
+          <p class="brand-subtitle">Your calm, capable co-pilot</p>
+        </div>
       </div>
-      <div class="header-right">
+
+      <div class="top-actions">
         <div v-if="isAuthenticated" class="model-selector">
           <button
             class="model-button"
             @click="showModelDropdown = !showModelDropdown"
             @blur="handleModelButtonBlur"
           >
-            <span class="model-label">Model:</span>
+            <span class="model-label">Model</span>
             <span class="model-name">{{ settingsStore.currentModel().name }}</span>
-            <span class="model-arrow">▼</span>
+            <span class="model-arrow">▾</span>
           </button>
           <div v-if="showModelDropdown" class="model-dropdown">
             <button
@@ -70,6 +110,7 @@ function handleModelButtonBlur() {
             </button>
           </div>
         </div>
+
         <button
           v-if="isAuthenticated"
           class="inbox-toggle"
@@ -78,9 +119,11 @@ function handleModelButtonBlur() {
         >
           Inbox
         </button>
+
         <div v-if="isAuthenticated" class="user-info">
           <span class="user-id">{{ authStore.userId }}</span>
         </div>
+
         <button
           v-if="!isAuthenticated"
           class="auth-button"
@@ -98,13 +141,58 @@ function handleModelButtonBlur() {
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="app-main">
-      <template v-if="isAuthenticated">
-        <ChatWindow :class="{ 'with-inbox': showInbox }" />
-        <InboxPanel v-if="showInbox" @close="showInbox = false" />
-      </template>
-      <div v-else class="login-prompt">
+    <main class="main-grid" :class="{ compact: isCompact }">
+      <aside class="contacts-panel" :class="{ open: showContacts || !isCompact }">
+        <div class="panel-header">
+          <div>
+            <h2>Contacts</h2>
+            <p>Assistant + services</p>
+          </div>
+          <button v-if="isCompact" class="panel-close" @click="showContacts = false">✕</button>
+        </div>
+        <ContactList
+          :contacts="contactsStore.orderedContacts"
+          :active-id="contactsStore.activeContactId"
+          @select="handleSelectContact"
+        />
+      </aside>
+
+      <section class="chat-panel">
+        <ChatWindow
+          :contact="activeContact"
+          :compact="isCompact"
+          @back="showContacts = true"
+        />
+      </section>
+
+      <aside v-if="isAuthenticated && !isCompact" class="details-panel">
+        <div class="details-card" v-if="!showInbox">
+          <h3>Contact Details</h3>
+          <div class="detail-item">
+            <span class="detail-label">Active</span>
+            <span class="detail-value">{{ activeContact?.name || 'None' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Status</span>
+            <span class="detail-value">{{ activeContact?.status || 'offline' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Type</span>
+            <span class="detail-value">{{ activeContact?.type || 'n/a' }}</span>
+          </div>
+          <div class="detail-actions">
+            <button class="ghost">Mute</button>
+            <button class="ghost">Archive</button>
+          </div>
+        </div>
+        <InboxPanel v-else @close="showInbox = false" />
+      </aside>
+
+      <div v-if="isAuthenticated && isCompact && showInbox" class="mobile-inbox">
+        <InboxPanel @close="showInbox = false" />
+      </div>
+
+      <div v-if="!isAuthenticated" class="login-prompt">
         <div class="login-card">
           <h2>Welcome to Yukie</h2>
           <p>Please log in to start chatting with your AI assistant.</p>
@@ -121,42 +209,77 @@ function handleModelButtonBlur() {
 </template>
 
 <style scoped>
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: #f5f5f5;
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+:global(body) {
+  margin: 0;
+  font-family: 'Space Grotesk', 'IBM Plex Sans', 'Helvetica Neue', sans-serif;
+  color: #0f172a;
+  background: radial-gradient(circle at top left, #fef9c3 0%, #f8fafc 40%, #e2e8f0 100%);
 }
 
-.app-header {
+:global(*) {
+  box-sizing: border-box;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  --panel: #ffffff;
+  --surface: #f8fafc;
+  --border: #e2e8f0;
+  --ink: #0f172a;
+  --muted: #64748b;
+}
+
+.top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
 }
 
-.header-left {
+.brand {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 14px;
 }
 
-.app-title {
-  font-size: 24px;
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f766e, #22c55e);
+  color: #fff;
+  display: grid;
+  place-items: center;
   font-weight: 700;
-  color: #6366f1;
+}
+
+.brand-title {
   margin: 0;
+  font-size: 22px;
 }
 
-.app-subtitle {
-  font-size: 14px;
-  color: #666;
+.brand-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
 }
 
-.header-right {
+.mobile-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 18px;
+}
+
+.top-actions {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -170,50 +293,35 @@ function handleModelButtonBlur() {
 .model-button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 6px 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   background: #fff;
-  color: #333;
   font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.model-button:hover {
-  background: #f5f5f5;
-  border-color: #6366f1;
 }
 
 .model-label {
-  color: #666;
-  font-size: 12px;
+  color: var(--muted);
 }
 
 .model-name {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
 }
 
 .model-arrow {
-  font-size: 10px;
-  color: #999;
-  transition: transform 0.2s;
-}
-
-.model-button:hover .model-arrow {
-  transform: translateY(1px);
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .model-dropdown {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   right: 0;
   background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   min-width: 220px;
   z-index: 1000;
   overflow: hidden;
@@ -227,7 +335,7 @@ function handleModelButtonBlur() {
   text-align: left;
   cursor: pointer;
   transition: background 0.15s;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .model-option:last-child {
@@ -235,145 +343,229 @@ function handleModelButtonBlur() {
 }
 
 .model-option:hover {
-  background: #f5f5f5;
+  background: #f8fafc;
 }
 
 .model-option.active {
-  background: #eef2ff;
-}
-
-.model-option.active .model-option-name {
-  color: #6366f1;
-  font-weight: 600;
+  background: rgba(15, 118, 110, 0.12);
 }
 
 .model-option-name {
   font-size: 14px;
-  color: #333;
-  font-weight: 500;
+  color: #0f172a;
+  font-weight: 600;
   margin-bottom: 2px;
 }
 
 .model-option-desc {
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
 }
 
 .inbox-toggle {
   padding: 8px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   background: #fff;
-  color: #333;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s;
-}
-
-.inbox-toggle:hover {
-  background: #f5f5f5;
 }
 
 .inbox-toggle.active {
-  background: #6366f1;
+  background: #0f766e;
   color: #fff;
-  border-color: #6366f1;
+  border-color: #0f766e;
 }
 
 .user-info {
   padding: 6px 12px;
-  background: #f0f0f0;
-  border-radius: 6px;
+  background: #f1f5f9;
+  border-radius: 8px;
 }
 
 .user-id {
-  font-size: 13px;
-  color: #666;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .auth-button {
   padding: 8px 16px;
   border: none;
-  border-radius: 8px;
-  background: #6366f1;
+  border-radius: 10px;
+  background: #0f766e;
   color: #fff;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.auth-button:hover {
-  background: #5558e3;
 }
 
 .auth-button.logout {
-  background: #ef4444;
+  background: #f97316;
 }
 
-.auth-button.logout:hover {
-  background: #dc2626;
-}
-
-.app-main {
+.main-grid {
   flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  min-height: 0;
+}
+
+.main-grid.compact {
+  grid-template-columns: 1fr;
+}
+
+.contacts-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-right: 1px solid var(--border);
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 18px 8px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.chat-panel {
+  min-width: 0;
+  display: flex;
+}
+
+.details-panel {
+  border-left: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 16px;
+}
+
+.details-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.details-card h3 {
+  margin: 0 0 14px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.detail-label {
+  color: var(--muted);
+}
+
+.detail-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.ghost {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
 }
 
 .login-prompt {
-  flex: 1;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
 }
 
 .login-card {
   background: #fff;
   padding: 40px;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
   text-align: center;
   max-width: 400px;
 }
 
 .login-card h2 {
   margin: 0 0 12px;
-  color: #333;
 }
 
 .login-card p {
   margin: 0 0 24px;
-  color: #666;
+  color: var(--muted);
 }
 
 .login-error {
   margin: 0 0 16px;
   padding: 12px;
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 6px;
-  color: #c33;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #b91c1c;
   font-size: 14px;
 }
 
 .login-button {
   padding: 12px 32px;
   border: none;
-  border-radius: 8px;
-  background: #6366f1;
+  border-radius: 10px;
+  background: #0f766e;
   color: #fff;
   font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
 }
 
-.login-button:hover {
-  background: #5558e3;
+.mobile-inbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 100;
 }
 
-.with-inbox {
-  flex: 1;
+@media (max-width: 980px) {
+  .contacts-panel {
+    position: fixed;
+    top: 72px;
+    bottom: 0;
+    left: 0;
+    width: 80%;
+    max-width: 320px;
+    transform: translateX(-100%);
+    z-index: 200;
+  }
+
+  .contacts-panel.open {
+    transform: translateX(0);
+    box-shadow: 24px 0 40px rgba(15, 23, 42, 0.2);
+  }
+
+  .details-panel {
+    display: none;
+  }
 }
 </style>

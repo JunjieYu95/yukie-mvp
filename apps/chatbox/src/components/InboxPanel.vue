@@ -121,8 +121,8 @@ function formatDate(dateString: string) {
   width: 360px;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-left: 1px solid #e0e0e0;
+  background: var(--panel, #fff);
+  border-left: 1px solid var(--border, #e2e8f0);
 }
 
 .inbox-header {
@@ -130,14 +130,14 @@ function formatDate(dateString: string) {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
 }
 
 .inbox-header h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--ink, #0f172a);
 }
 
 .header-actions {
@@ -147,16 +147,16 @@ function formatDate(dateString: string) {
 
 .refresh-button {
   padding: 6px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 6px;
   background: #fff;
-  color: #666;
+  color: var(--muted, #64748b);
   font-size: 13px;
   cursor: pointer;
 }
 
 .refresh-button:hover:not(:disabled) {
-  background: #f5f5f5;
+  background: #f1f5f9;
 }
 
 .refresh-button:disabled {
@@ -173,13 +173,13 @@ function formatDate(dateString: string) {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #666;
+  color: var(--muted, #64748b);
   cursor: pointer;
 }
 
 .close-button:hover {
-  background: #f5f5f5;
-  color: #333;
+  background: #f1f5f9;
+  color: var(--ink, #0f172a);
 }
 
 .inbox-content {
@@ -197,7 +197,7 @@ function formatDate(dateString: string) {
   justify-content: center;
   height: 200px;
   text-align: center;
-  color: #666;
+  color: var(--muted, #64748b);
 }
 
 .empty-icon {
@@ -207,7 +207,7 @@ function formatDate(dateString: string) {
 
 .empty-hint {
   font-size: 13px;
-  color: #999;
+  color: #94a3b8;
   margin-top: 4px;
 }
 

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useAuthStore } from './auth';
 import { useSettingsStore } from './settings';
+import { useContactsStore } from './contacts';
 import { sendChatMessage } from '../lib/api';
 
 export interface Message {
@@ -24,9 +25,11 @@ export interface Conversation {
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore();
   const settingsStore = useSettingsStore();
+  const contactsStore = useContactsStore();
 
   const conversations = ref<Map<string, Conversation>>(new Map());
   const activeConversationId = ref<string | null>(null);
+  const conversationByContactId = ref<Map<string, string>>(new Map());
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const processingStatus = ref<{
@@ -63,15 +66,23 @@ export const useChatStore = defineStore('chat', () => {
     return id;
   }
 
-  function ensureConversation(): string {
-    if (!activeConversationId.value) {
-      return createConversation();
+  function ensureConversation(contactId: string): string {
+    const existing = conversationByContactId.value.get(contactId);
+    if (existing) {
+      activeConversationId.value = existing;
+      return existing;
     }
-    return activeConversationId.value;
+    const newConversationId = createConversation();
+    conversationByContactId.value.set(contactId, newConversationId);
+    activeConversationId.value = newConversationId;
+    return newConversationId;
   }
 
-  function addMessage(message: Omit<Message, 'id' | 'timestamp' | 'status'>): Message {
-    const conversationId = ensureConversation();
+  function addMessage(
+    message: Omit<Message, 'id' | 'timestamp' | 'status'>,
+    contactId: string
+  ): Message {
+    const conversationId = ensureConversation(contactId);
     const conversation = conversations.value.get(conversationId)!;
 
     const newMessage: Message = {
@@ -83,6 +94,11 @@ export const useChatStore = defineStore('chat', () => {
 
     conversation.messages.push(newMessage);
     conversation.updatedAt = new Date();
+
+    contactsStore.updateLastMessage(contactId, message.content, newMessage.timestamp);
+    if (message.role === 'assistant' && contactsStore.activeContactId !== contactId) {
+      contactsStore.incrementUnread(contactId);
+    }
 
     return newMessage;
   }
@@ -105,15 +121,29 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!content.trim()) return;
 
+    const activeContact = contactsStore.activeContact;
+    if (!activeContact) {
+      error.value = 'No contact selected';
+      return;
+    }
+
+    if (activeContact.type !== 'assistant') {
+      error.value = 'Direct service chat is coming soon';
+      return;
+    }
+
     error.value = null;
     isLoading.value = true;
     processingStatus.value = { stage: 'routing' };
 
     // Add user message
-    const userMessage = addMessage({
-      role: 'user',
-      content: content.trim(),
-    });
+    const userMessage = addMessage(
+      {
+        role: 'user',
+        content: content.trim(),
+      },
+      activeContact.id
+    );
 
     // Simulate progress updates
     const progressInterval = setInterval(() => {
@@ -132,7 +162,7 @@ export const useChatStore = defineStore('chat', () => {
     }, 500);
 
     try {
-      const conversationId = ensureConversation();
+      const conversationId = ensureConversation(activeContact.id);
 
       const response = await sendChatMessage(
         content.trim(),
@@ -156,12 +186,15 @@ export const useChatStore = defineStore('chat', () => {
       updateMessage(userMessage.id, { status: 'sent' });
 
       // Add assistant response
-      addMessage({
-        role: 'assistant',
-        content: response.response,
-        serviceUsed: response.serviceUsed,
-        actionInvoked: response.actionInvoked,
-      });
+      addMessage(
+        {
+          role: 'assistant',
+          content: response.response,
+          serviceUsed: response.serviceUsed,
+          actionInvoked: response.actionInvoked,
+        },
+        activeContact.id
+      );
 
       // Show routing details if available
       if (response.routingDetails && response.routingDetails.targetService !== 'none') {
@@ -169,15 +202,19 @@ export const useChatStore = defineStore('chat', () => {
         const serviceName = response.routingDetails.targetService === 'habit-tracker' 
           ? 'Habit Tracker' 
           : response.routingDetails.targetService;
-        addMessage({
-          role: 'system',
-          content: `✓ Routed to ${serviceName} (${Math.round(response.routingDetails.confidence * 100)}% confidence)${response.actionInvoked ? ` → ${response.actionInvoked}` : ''}`,
-        });
+        addMessage(
+          {
+            role: 'system',
+            content: `✓ Routed to ${serviceName} (${Math.round(response.routingDetails.confidence * 100)}% confidence)${response.actionInvoked ? ` → ${response.actionInvoked}` : ''}`,
+          },
+          activeContact.id
+        );
       }
 
       // Update conversation ID if server returned a different one
       if (response.conversationId !== conversationId) {
         activeConversationId.value = response.conversationId;
+        conversationByContactId.value.set(activeContact.id, response.conversationId);
       }
     } catch (err) {
       clearInterval(progressInterval);
@@ -185,10 +222,13 @@ export const useChatStore = defineStore('chat', () => {
       error.value = err instanceof Error ? err.message : 'Failed to send message';
 
       // Add error message
-      addMessage({
-        role: 'system',
-        content: 'Sorry, I had trouble processing your message. Please try again.',
-      });
+      addMessage(
+        {
+          role: 'system',
+          content: 'Sorry, I had trouble processing your message. Please try again.',
+        },
+        activeContact.id
+      );
     } finally {
       isLoading.value = false;
       processingStatus.value = null;
@@ -196,18 +236,22 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function clearConversation() {
-    if (activeConversationId.value) {
-      conversations.value.delete(activeConversationId.value);
+    const activeContact = contactsStore.activeContact;
+    if (!activeContact) return;
+    const conversationId = conversationByContactId.value.get(activeContact.id);
+    if (conversationId) {
+      conversations.value.delete(conversationId);
+      conversationByContactId.value.delete(activeContact.id);
     }
     activeConversationId.value = null;
     error.value = null;
     processingStatus.value = null;
   }
 
-  function switchConversation(conversationId: string) {
-    if (conversations.value.has(conversationId)) {
-      activeConversationId.value = conversationId;
-    }
+  function setActiveContact(contactId: string) {
+    contactsStore.setActiveContact(contactId);
+    const conversationId = conversationByContactId.value.get(contactId);
+    activeConversationId.value = conversationId || null;
   }
 
   return {
@@ -222,6 +266,6 @@ export const useChatStore = defineStore('chat', () => {
     addMessage,
     sendMessage,
     clearConversation,
-    switchConversation,
+    setActiveContact,
   };
 });

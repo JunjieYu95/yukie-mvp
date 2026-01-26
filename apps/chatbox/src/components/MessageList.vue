@@ -8,13 +8,13 @@ defineProps<{
 </script>
 
 <template>
-  <div class="message-list">
+  <TransitionGroup name="message" tag="div" class="message-list">
     <MessageBubble
       v-for="message in messages"
       :key="message.id"
       :message="message"
     />
-  </div>
+  </TransitionGroup>
 </template>
 
 <style scoped>
@@ -22,5 +22,16 @@ defineProps<{
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.message-enter-active,
+.message-leave-active {
+  transition: all 0.2s ease;
+}
+
+.message-enter-from,
+.message-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 </style>

@@ -69,22 +69,24 @@ const actionDisplayName = computed(() => {
 .message-bubble {
   max-width: 80%;
   padding: 12px 16px;
-  border-radius: 16px;
+  border-radius: 18px;
   word-wrap: break-word;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .user-message {
   align-self: flex-end;
-  background: #6366f1;
-  color: #fff;
-  border-bottom-right-radius: 4px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #f8fafc;
+  border-bottom-right-radius: 6px;
 }
 
 .assistant-message {
   align-self: flex-start;
-  background: #f3f4f6;
-  color: #333;
-  border-bottom-left-radius: 4px;
+  background: #f8fafc;
+  color: #0f172a;
+  border-bottom-left-radius: 6px;
 }
 
 .system-message {
@@ -94,11 +96,12 @@ const actionDisplayName = computed(() => {
   font-size: 13px;
   text-align: center;
   max-width: 90%;
+  box-shadow: none;
 }
 
 .message-bubble.error {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .message-bubble.sending {
@@ -108,6 +111,7 @@ const actionDisplayName = computed(() => {
 .message-content {
   white-space: pre-wrap;
   line-height: 1.5;
+  font-size: 15px;
 }
 
 .message-meta {
@@ -134,23 +138,23 @@ const actionDisplayName = computed(() => {
 
 .service-badge {
   padding: 2px 8px;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(15, 118, 110, 0.12);
+  border: 1px solid rgba(15, 118, 110, 0.28);
   border-radius: 4px;
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 600;
-  color: #6366f1;
+  color: #0f766e;
 }
 
 .action-badge {
   padding: 2px 8px;
-  background: rgba(107, 114, 128, 0.1);
-  border: 1px solid rgba(107, 114, 128, 0.3);
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 4px;
   font-size: 10px;
   text-transform: capitalize;
-  color: #6b7280;
+  color: #475569;
 }
 
 .user-message .service-badge {
