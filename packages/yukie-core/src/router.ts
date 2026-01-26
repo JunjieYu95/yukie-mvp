@@ -376,6 +376,10 @@ ${actionsDescription}
 
 User message: "${userMessage}"
 
+Rules:
+- Only include date/month parameters if the user explicitly specifies an absolute date or month (e.g., YYYY-MM-DD or YYYY-MM).
+- If the user says "today", "yesterday", "this week", or "this month", omit date/month parameters and let the server resolve them.
+
 Respond ONLY with valid JSON in this format:
 {
   "function": "<action-name>",
