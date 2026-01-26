@@ -77,7 +77,7 @@ function handleClear() {
           <li @click="handleSend('Check me in for today')">
             Check me in for today
           </li>
-          <li @click="handleSend('What\\'s my current streak?')">
+          <li @click="handleSend(`What's my current streak?`)">
             What's my current streak?
           </li>
           <li @click="handleSend('How many days this month?')">
