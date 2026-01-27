@@ -413,6 +413,25 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
         healthEndpoint: '/api/health',
         enabled: true,
       },
+      {
+        id: 'momentum',
+        name: 'Momentum',
+        description: 'Log success or failure events to build momentum for daily habits.',
+        baseUrl: process.env.MOMENTUM_URL || 'https://momentum-mu-one.vercel.app',
+        mcpEndpoint:
+          process.env.MOMENTUM_MCP_URL ||
+          `${process.env.MOMENTUM_URL || 'https://momentum-mu-one.vercel.app'}/api/mcp`,
+        capabilities: [
+          'momentum tracking',
+          'success log',
+          'failure log',
+          'habit outcome',
+          'did it',
+          'screwed it',
+        ],
+        scopes: [],
+        enabled: true,
+      },
     ],
   };
 }

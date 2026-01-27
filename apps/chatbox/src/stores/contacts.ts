@@ -48,6 +48,15 @@ const seedContacts: Contact[] = [
     unreadCount: 0,
     accent: '#06b6d4',
   },
+  {
+    id: 'momentum',
+    name: 'Momentum',
+    subtitle: 'Did it · Screwed it',
+    type: 'service',
+    status: 'online',
+    unreadCount: 0,
+    accent: '#22c55e',
+  },
 ];
 
 export const useContactsStore = defineStore('contacts', () => {
