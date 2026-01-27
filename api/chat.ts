@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticateRequest, hasScope, type AuthContext } from './_lib/auth.js';
 import {
-  processChatMessage,
-  initializeRegistry,
+  processMCPChatMessage,
+  initializeMCPRegistry,
   createLogger,
 } from './_lib/yukie-core.js';
 
@@ -82,7 +82,7 @@ let registryInitialized = false;
 
 function ensureRegistryInitialized(): void {
   if (!registryInitialized) {
-    initializeRegistry();
+    initializeMCPRegistry();
     registryInitialized = true;
     logger.info('Registry initialized');
   }
@@ -177,14 +177,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       let result;
       try {
-        result = await processChatMessage({
+        result = await processMCPChatMessage({
           message: body.message,
           auth,
           conversationId,
           model: body.model,
         });
       } catch (processError) {
-        console.error('[CHAT] processChatMessage failed:', processError);
+        console.error('[CHAT] processMCPChatMessage failed:', processError);
         res.status(500).json({
           error: 'Internal Server Error',
           message: 'Chat processing failed: ' + (processError instanceof Error ? processError.message : String(processError)),
@@ -204,7 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         response: result.response,
         conversationId,
         serviceUsed: result.serviceUsed,
-        actionInvoked: result.actionInvoked,
+        actionInvoked: result.toolInvoked,
         routingDetails: result.routingDetails,
       });
     } else {
