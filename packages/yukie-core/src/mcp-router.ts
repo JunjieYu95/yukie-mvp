@@ -1,25 +1,24 @@
 /**
- * MCP-Aware Router
+ * MCP Router
  *
- * This router supports both YWAIP and MCP protocols, using the MCP registry
- * to discover and invoke tools across services.
+ * Routes user messages to appropriate MCP tools and services.
+ * Uses LLM-based routing to select the best tool for each request.
  */
 
 import type {
-  YNFPRoutingResult,
   AuthContext,
   MCPTool,
   MCPToolsCallResult,
 } from '../../shared/protocol/src/types.js';
-import { getMCPRegistry, type MCPServiceRegistryEntry, type InvokeContext } from './mcp-registry.js';
+import { getMCPRegistry, type InvokeContext } from './mcp-registry.js';
 import { getLLMClient, completeWithJSON } from './llm/client.js';
-import { buildRoutingPrompt, buildFallbackPrompt, buildResponseFormattingPrompt } from './llm/prompts.js';
+import { buildFallbackPrompt, buildResponseFormattingPrompt } from './llm/prompts.js';
 import { createLogger, startTimer } from '../../shared/observability/src/logger.js';
 
 const logger = createLogger('mcp-router');
 
 // ============================================================================
-// Tool-Based Routing
+// Types
 // ============================================================================
 
 interface ToolWithService {
@@ -28,14 +27,20 @@ interface ToolWithService {
   serviceName: string;
 }
 
-export async function routeToTool(
-  userMessage: string,
-  model?: string
-): Promise<{
+interface RoutingResult {
   selectedTool: ToolWithService | null;
   confidence: number;
   reasoning: string;
-}> {
+}
+
+// ============================================================================
+// Tool-Based Routing
+// ============================================================================
+
+export async function routeToTool(
+  userMessage: string,
+  model?: string
+): Promise<RoutingResult> {
   const registry = getMCPRegistry();
   const services = registry.getEnabled();
 
@@ -163,76 +168,6 @@ If no tool is appropriate, respond with:
       selectedTool: null,
       confidence: 0,
       reasoning: 'Tool routing failed due to an error',
-    };
-  }
-}
-
-// ============================================================================
-// Service-Based Routing (Backward Compatible)
-// ============================================================================
-
-export async function routeMessage(userMessage: string, model?: string): Promise<YNFPRoutingResult> {
-  const registry = getMCPRegistry();
-  const services = registry.getEnabled();
-
-  if (services.length === 0) {
-    return {
-      targetService: 'none',
-      confidence: 1.0,
-      reasoning: 'No services are currently available',
-    };
-  }
-
-  const timer = startTimer();
-
-  try {
-    // Use the existing routing prompt builder
-    const systemPrompt = buildRoutingPrompt(services as unknown as Array<{ id: string; name: string; description: string; capabilities: string[] }>);
-    const userPromptContent = `User message: "${userMessage}"
-
-Respond with JSON in this format:
-{
-  "targetService": "<service-id or 'none'>",
-  "confidence": <0.0-1.0>,
-  "reasoning": "<brief explanation>"
-}`;
-
-    const { result, error } = await completeWithJSON<YNFPRoutingResult>(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPromptContent },
-      ],
-      {
-        temperature: 0.1,
-        maxTokens: 256,
-        model,
-      }
-    );
-
-    const timing = timer();
-
-    if (!result || error) {
-      logger.warn('Failed to parse routing result', { error, durationMs: timing.durationMs });
-      return {
-        targetService: 'none',
-        confidence: 0,
-        reasoning: 'Failed to determine routing',
-      };
-    }
-
-    logger.info('Routing complete', {
-      targetService: result.targetService,
-      confidence: result.confidence,
-      durationMs: timing.durationMs,
-    });
-
-    return result;
-  } catch (error) {
-    logger.error('Routing error', error);
-    return {
-      targetService: 'none',
-      confidence: 0,
-      reasoning: 'Routing failed due to an error',
     };
   }
 }
@@ -504,162 +439,4 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
       reasoning: routing.reasoning,
     },
   };
-}
-
-// ============================================================================
-// Backward-Compatible Chat Flow (Uses Service Routing)
-// ============================================================================
-
-export async function processLegacyChatMessage(options: MCPChatFlowOptions): Promise<MCPChatFlowResult> {
-  const { message, auth, model } = options;
-  const registry = getMCPRegistry();
-
-  // Step 1: Route to a service
-  const routing = await routeMessage(message, model);
-
-  // Step 2: Handle routing result
-  if (routing.targetService === 'none' || routing.confidence < 0.5) {
-    const response = await generateFallbackResponse(message, model);
-    return {
-      response,
-      routingConfidence: routing.confidence,
-      routingDetails: {
-        tool: 'none',
-        service: routing.targetService,
-        confidence: routing.confidence,
-        reasoning: routing.reasoning,
-      },
-    };
-  }
-
-  // Step 3: Get tools from the service
-  const tools = await registry.fetchTools(routing.targetService);
-
-  if (!tools || tools.length === 0) {
-    const response = await generateFallbackResponse(message, model);
-    return {
-      response,
-      routingConfidence: routing.confidence,
-      routingDetails: {
-        tool: 'none',
-        service: routing.targetService,
-        confidence: routing.confidence,
-        reasoning: routing.reasoning,
-      },
-    };
-  }
-
-  // Step 4: Select the best tool from this service
-  const toolSelection = await selectBestTool(message, tools, model);
-
-  if (!toolSelection) {
-    const response = await generateFallbackResponse(message, model);
-    return {
-      response,
-      serviceUsed: routing.targetService,
-      routingConfidence: routing.confidence,
-      routingDetails: {
-        tool: 'none',
-        service: routing.targetService,
-        confidence: routing.confidence,
-        reasoning: routing.reasoning,
-      },
-    };
-  }
-
-  // Step 5: Extract parameters
-  const toolCall = await selectToolParameters(message, toolSelection.tool, model);
-
-  if (!toolCall) {
-    const response = await generateFallbackResponse(message, model);
-    return {
-      response,
-      serviceUsed: routing.targetService,
-      routingConfidence: routing.confidence,
-      routingDetails: {
-        tool: toolSelection.tool.name,
-        service: routing.targetService,
-        confidence: routing.confidence,
-        reasoning: routing.reasoning,
-      },
-    };
-  }
-
-  // Step 6: Invoke the tool
-  const service = registry.get(routing.targetService);
-  const serviceName = service?.name || routing.targetService;
-
-  const toolResult = await invokeTool({
-    serviceId: routing.targetService,
-    toolName: toolCall.toolName,
-    args: toolCall.args,
-    auth,
-  });
-
-  // Step 7: Format the response
-  let response: string;
-  if (toolResult.isError) {
-    const errorText = toolResult.content
-      .filter((c) => c.type === 'text' && c.text)
-      .map((c) => c.text)
-      .join('\n');
-    response = `I encountered an issue: ${errorText || 'Unknown error'}. Please try again.`;
-  } else {
-    response = await formatResponse(message, toolResult, serviceName, model);
-  }
-
-  return {
-    response,
-    serviceUsed: routing.targetService,
-    toolInvoked: toolCall.toolName,
-    routingConfidence: routing.confidence,
-    routingDetails: {
-      tool: toolSelection.tool.name,
-      service: routing.targetService,
-      confidence: routing.confidence,
-      reasoning: routing.reasoning,
-    },
-  };
-}
-
-async function selectBestTool(
-  userMessage: string,
-  tools: MCPTool[],
-  model?: string
-): Promise<{ tool: MCPTool } | null> {
-  const toolsDescription = tools
-    .map((t) => `- ${t.name}: ${t.description}`)
-    .join('\n');
-
-  const prompt = `You are a tool selector. Given a user message and available tools, determine which tool to use.
-
-Available tools:
-${toolsDescription}
-
-User message: "${userMessage}"
-
-Respond ONLY with valid JSON:
-{
-  "tool": "<tool-name>"
-}`;
-
-  try {
-    const { result, error } = await completeWithJSON<{ tool: string }>(
-      [{ role: 'user', content: prompt }],
-      {
-        temperature: 0.1,
-        maxTokens: 128,
-        model,
-      }
-    );
-
-    if (!result || error) {
-      return null;
-    }
-
-    const selectedTool = tools.find((t) => t.name === result.tool);
-    return selectedTool ? { tool: selectedTool } : null;
-  } catch {
-    return null;
-  }
 }

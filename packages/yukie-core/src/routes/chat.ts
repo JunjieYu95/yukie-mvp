@@ -1,12 +1,8 @@
 import type { Request, Response } from 'express';
 import type { ChatRequest, ChatResponse, AuthContext } from '../../../shared/protocol/src/types';
-import { processChatMessage } from '../router';
-import { processMCPChatMessage, processLegacyChatMessage, type MCPChatFlowResult } from '../mcp-router';
+import { processMCPChatMessage } from '../mcp-router';
 import { canUseChat, checkRateLimit } from '../policy';
 import { createLogger, startTimer } from '../../../shared/observability/src/logger';
-
-// Use MCP protocol if environment variable is set
-const USE_MCP = process.env.USE_MCP_PROTOCOL === 'true';
 
 const logger = createLogger('chat-route');
 
@@ -75,44 +71,26 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
       userId: req.auth.userId,
       conversationId: body.conversationId,
       messageLength: body.message.length,
-      useMCP: USE_MCP,
     });
 
-    // Process the message using MCP or legacy router
-    let result: MCPChatFlowResult | Awaited<ReturnType<typeof processChatMessage>>;
-
-    if (USE_MCP) {
-      // Use the new MCP router
-      result = await processMCPChatMessage({
-        message: body.message,
-        auth: req.auth,
-        conversationId: body.conversationId,
-        model: body.model,
-      });
-    } else {
-      // Use the legacy YWAIP router
-      result = await processChatMessage({
-        message: body.message,
-        auth: req.auth,
-        conversationId: body.conversationId,
-        model: body.model,
-      });
-    }
+    // Process the message using MCP router
+    const result = await processMCPChatMessage({
+      message: body.message,
+      auth: req.auth,
+      conversationId: body.conversationId,
+      model: body.model,
+    });
 
     const timing = timer();
 
-    // Build response (handle both MCP and legacy result formats)
-    const actionOrTool = USE_MCP
-      ? (result as MCPChatFlowResult).toolInvoked
-      : (result as Awaited<ReturnType<typeof processChatMessage>>).actionInvoked;
-
+    // Build response
     const response: ChatResponse = {
       response: result.response,
       conversationId: body.conversationId || generateConversationId(),
       serviceUsed: result.serviceUsed,
-      actionInvoked: actionOrTool,
+      toolInvoked: result.toolInvoked,
       routingDetails: result.routingDetails ? {
-        targetService: result.routingDetails.service || result.routingDetails.targetService || 'unknown',
+        targetService: result.routingDetails.service || 'unknown',
         confidence: result.routingDetails.confidence,
         reasoning: result.routingDetails.reasoning,
       } : undefined,
@@ -121,8 +99,7 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
     logger.info('Chat message processed', {
       userId: req.auth.userId,
       serviceUsed: result.serviceUsed,
-      actionInvoked: actionOrTool,
-      useMCP: USE_MCP,
+      toolInvoked: result.toolInvoked,
       durationMs: timing.durationMs,
     });
 

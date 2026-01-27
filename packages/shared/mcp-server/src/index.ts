@@ -15,11 +15,6 @@ export {
   type RegisteredTool,
   type RegisteredResource,
   type RegisteredPrompt,
-  // YWAIP conversion
-  ywaipActionToMCPTool,
-  ywaipActionsToMCPTools,
-  ywaipParameterToJsonSchemaProperty,
-  ywaipTypeToJsonSchemaType,
   // Result helpers
   textContent,
   jsonContent,

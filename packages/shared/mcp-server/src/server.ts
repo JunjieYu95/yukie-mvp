@@ -25,9 +25,6 @@ import type {
   MCPPromptsListResult,
   MCPPromptsGetResult,
   MCPServerConfig,
-  MCPJsonSchemaProperty,
-  YWAIPAction,
-  YWAIPParameter,
 } from '../../protocol/src/types';
 
 import { MCPErrorCodes } from '../../protocol/src/types';
@@ -358,75 +355,6 @@ export class MCPError extends Error {
     this.code = code;
     this.data = data;
   }
-}
-
-// ============================================================================
-// YWAIP to MCP Conversion Utilities
-// ============================================================================
-
-/**
- * Convert a YWAIP parameter type to MCP JSON Schema type
- */
-export function ywaipTypeToJsonSchemaType(
-  type: YWAIPParameter['type']
-): MCPJsonSchemaProperty['type'] {
-  const mapping: Record<YWAIPParameter['type'], MCPJsonSchemaProperty['type']> = {
-    string: 'string',
-    number: 'number',
-    boolean: 'boolean',
-    object: 'object',
-    array: 'array',
-  };
-  return mapping[type] || 'string';
-}
-
-/**
- * Convert a YWAIP parameter to MCP JSON Schema property
- */
-export function ywaipParameterToJsonSchemaProperty(
-  param: YWAIPParameter
-): MCPJsonSchemaProperty {
-  return {
-    type: ywaipTypeToJsonSchemaType(param.type),
-    description: param.description,
-    default: param.default,
-  };
-}
-
-/**
- * Convert a YWAIP action to MCP tool definition
- */
-export function ywaipActionToMCPTool(action: YWAIPAction): MCPTool {
-  const properties: Record<string, MCPJsonSchemaProperty> = {};
-  const required: string[] = [];
-
-  for (const param of action.parameters) {
-    properties[param.name] = ywaipParameterToJsonSchemaProperty(param);
-    if (param.required) {
-      required.push(param.name);
-    }
-  }
-
-  return {
-    name: action.name,
-    description: action.description,
-    inputSchema: {
-      type: 'object',
-      properties,
-      required: required.length > 0 ? required : undefined,
-    },
-    annotations: {
-      readOnlyHint: action.name.includes('query') || action.name.includes('stats'),
-      destructiveHint: action.name.includes('delete'),
-    },
-  };
-}
-
-/**
- * Convert multiple YWAIP actions to MCP tools
- */
-export function ywaipActionsToMCPTools(actions: YWAIPAction[]): MCPTool[] {
-  return actions.map(ywaipActionToMCPTool);
 }
 
 // ============================================================================

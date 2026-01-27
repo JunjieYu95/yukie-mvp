@@ -5,25 +5,14 @@
  * Uses relative imports to ensure proper bundling.
  *
  * Module structure:
- * - registry.ts: Original service registry (basic)
- * - router.ts: Original LLM-based router (basic)
+ * - mcp-registry.ts: MCP service registry
+ * - mcp-router.ts: MCP tool-based router
  * - enhanced-registry/: Enhanced registry with capability indexing (Phase 2)
  * - retrieval-router/: Retrieval-based routing with keyword extraction (Phase 3)
  */
 
 // Re-export types from protocol
 export type {
-  YWAIPServiceMeta,
-  YWAIPAction,
-  YWAIPParameter,
-  YWAIPActionsResponse,
-  YWAIPInvokeRequest,
-  YWAIPInvokeResponse,
-  YWAIPContext,
-  YWAIPError,
-  YNFPRoutingResult,
-  YNFPFunctionCall,
-  YNFPResponse,
   ServiceRegistryEntry,
   ChatRequest,
   ChatResponse,
@@ -33,6 +22,14 @@ export type {
   LLMCompletionOptions,
   LLMCompletionResult,
   HealthResponse,
+  // MCP types
+  MCPJsonRpcRequest,
+  MCPJsonRpcResponse,
+  MCPTool,
+  MCPToolsCallResult,
+  MCPToolContent,
+  MCPServerCapabilities,
+  MCPInitializeResult,
 } from '../../packages/shared/protocol/src/types.js';
 
 // Re-export logger utilities
@@ -62,24 +59,30 @@ export {
   buildConversationSummaryPrompt,
 } from '../../packages/yukie-core/src/llm/prompts.js';
 
-// Re-export original registry (registry.ts file)
+// Re-export MCP registry
 export {
-  getRegistry,
-  resetRegistry,
-  getDefaultServicesConfig,
-  initializeRegistry,
-} from '../../packages/yukie-core/src/registry.js';
+  getMCPRegistry,
+  resetMCPRegistry,
+  getDefaultMCPServicesConfig,
+  initializeMCPRegistry,
+} from '../../packages/yukie-core/src/mcp-registry.js';
+export type {
+  MCPServiceRegistryEntry,
+  MCPConnectionState,
+  InvokeContext,
+} from '../../packages/yukie-core/src/mcp-registry.js';
 
-// Re-export original router (router.ts file)
+// Re-export MCP router
 export {
-  routeMessage,
-  invokeService,
+  routeToTool,
+  invokeTool,
   formatResponse,
   generateFallbackResponse,
-  processChatMessage,
-} from '../../packages/yukie-core/src/router.js';
+  selectToolParameters,
+  processMCPChatMessage,
+} from '../../packages/yukie-core/src/mcp-router.js';
 export type {
-  InvokeServiceOptions,
-  ChatFlowOptions,
-  ChatFlowResult,
-} from '../../packages/yukie-core/src/router.js';
+  InvokeToolOptions,
+  MCPChatFlowOptions,
+  MCPChatFlowResult,
+} from '../../packages/yukie-core/src/mcp-router.js';

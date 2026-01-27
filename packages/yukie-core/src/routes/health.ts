@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { HealthResponse } from '../../../shared/protocol/src/types';
-import { getRegistry } from '../registry';
+import { getMCPRegistry } from '../mcp-registry';
 import { createLogger } from '../../../shared/observability/src/logger';
 
 const logger = createLogger('health-route');
@@ -28,7 +28,7 @@ export function handleHealth(_req: Request, res: Response): void {
 
 export async function handleReadiness(_req: Request, res: Response): Promise<void> {
   try {
-    const registry = getRegistry();
+    const registry = getMCPRegistry();
     const services = registry.getEnabled();
 
     // Check if at least one service is healthy
@@ -85,7 +85,7 @@ export function handleLiveness(_req: Request, res: Response): void {
 
 export async function handleServicesHealth(_req: Request, res: Response): Promise<void> {
   try {
-    const registry = getRegistry();
+    const registry = getMCPRegistry();
     const healthResults = await registry.checkAllHealth();
 
     const services: Record<string, { ok: boolean; lastCheck?: number }> = {};

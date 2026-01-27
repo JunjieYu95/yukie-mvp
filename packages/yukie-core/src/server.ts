@@ -15,13 +15,10 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import type { AuthContext } from '../../shared/protocol/src/types';
 import { authenticateRequest } from '../../shared/auth/src/auth';
-import { initializeRegistry } from './registry';
 import { initializeMCPRegistry } from './mcp-registry';
 import { startRateLimitCleanup, stopRateLimitCleanup } from './policy';
 import { startInboxCleanup, stopInboxCleanup } from './inbox';
 
-// Use MCP protocol if environment variable is set
-const USE_MCP = process.env.USE_MCP_PROTOCOL === 'true';
 import { setupChatRoutes } from './routes/chat';
 import { setupInboxRoutes } from './routes/inbox';
 import { setupHealthRoutes } from './routes/health';
@@ -151,6 +148,7 @@ export function createServer(options: ServerOptions = {}) {
     res.json({
       service: 'yukie-core',
       version: process.env.npm_package_version || '1.0.0',
+      protocol: 'mcp',
       endpoints: {
         health: {
           '/healthz': 'Basic health check (no auth required)',
@@ -191,14 +189,10 @@ export async function startServer(options: ServerOptions = {}): Promise<{
 }> {
   const port = options.port || parseInt(process.env.PORT || '3000', 10);
 
-  // Initialize components
-  if (USE_MCP) {
-    logger.info('Using MCP protocol for service communication');
-    initializeMCPRegistry();
-  } else {
-    logger.info('Using YWAIP protocol for service communication');
-    initializeRegistry();
-  }
+  // Initialize MCP registry
+  logger.info('Initializing MCP service registry');
+  initializeMCPRegistry();
+
   startRateLimitCleanup();
   startInboxCleanup();
 
@@ -206,7 +200,7 @@ export async function startServer(options: ServerOptions = {}): Promise<{
 
   return new Promise((resolve) => {
     const server = app.listen(port, () => {
-      logger.info('Server started', { port });
+      logger.info('Server started', { port, protocol: 'mcp' });
 
       resolve({
         app,

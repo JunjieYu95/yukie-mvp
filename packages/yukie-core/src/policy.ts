@@ -1,6 +1,6 @@
 import type { AuthContext } from '../../shared/protocol/src/types';
 import { requireScopes, SCOPES } from '../../shared/auth/src/auth';
-import { getRegistry } from './registry';
+import { getMCPRegistry } from './mcp-registry';
 import { createLogger } from '../../shared/observability/src/logger';
 
 const logger = createLogger('policy');
@@ -28,7 +28,7 @@ export interface RateLimitResult {
 
 // Check if user can access a service
 export function canAccessService(auth: AuthContext, serviceId: string): PolicyCheckResult {
-  const registry = getRegistry();
+  const registry = getMCPRegistry();
   const service = registry.get(serviceId);
 
   if (!service) {

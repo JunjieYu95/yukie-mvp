@@ -1,105 +1,5 @@
-// YWAIP (Yukie-Worker Agentic Invocation Protocol) Types
-// Protocol version: 1.0
-
-// ============================================================================
-// Core Protocol Types
-// ============================================================================
-
-export interface YWAIPServiceMeta {
-  service: string;
-  version: string;
-  protocol: 'ywaip';
-  protocolVersion: '1.0';
-  description: string;
-  capabilities: string[];
-  scopes: string[];
-}
-
-export interface YWAIPAction {
-  name: string;
-  description: string;
-  parameters: YWAIPParameter[];
-  requiredScopes: string[];
-  returnsAsync?: boolean;
-}
-
-export interface YWAIPParameter {
-  name: string;
-  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
-  required: boolean;
-  description: string;
-  default?: unknown;
-}
-
-export interface YWAIPActionsResponse {
-  actions: YWAIPAction[];
-}
-
-export interface YWAIPInvokeRequest {
-  action: string;
-  params: Record<string, unknown>;
-  context?: YWAIPContext;
-}
-
-export interface YWAIPContext {
-  userId?: string;
-  conversationId?: string;
-  requestId?: string;
-  scopes?: string[];
-  utcOffsetMinutes?: number;
-}
-
-export interface YWAIPInvokeResponse {
-  success: boolean;
-  result?: unknown;
-  error?: YWAIPError;
-  asyncJobId?: string;
-}
-
-export interface YWAIPError {
-  code: string;
-  message: string;
-  details?: Record<string, unknown>;
-}
-
-// ============================================================================
-// YNFP (Yukie Natural-language Function Protocol) Types
-// ============================================================================
-
-export interface YNFPRequest {
-  utterance: string;
-  context?: YNFPContext;
-}
-
-export interface YNFPContext {
-  userId?: string;
-  conversationHistory?: YNFPMessage[];
-  serviceHint?: string;
-}
-
-export interface YNFPMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: string;
-}
-
-export interface YNFPRoutingResult {
-  targetService: string;
-  confidence: number;
-  reasoning: string;
-}
-
-export interface YNFPFunctionCall {
-  function: string;
-  params: Record<string, unknown>;
-}
-
-export interface YNFPResponse {
-  response: string;
-  functionCalled?: YNFPFunctionCall;
-  serviceUsed?: string;
-  asyncJobId?: string;
-}
+// Yukie Protocol Types
+// Using MCP (Model Context Protocol) - https://modelcontextprotocol.io
 
 // ============================================================================
 // Yukie Core Types
@@ -127,7 +27,7 @@ export interface ChatResponse {
   conversationId: string;
   asyncJobId?: string;
   serviceUsed?: string;
-  actionInvoked?: string;
+  toolInvoked?: string;
   routingDetails?: {
     targetService: string;
     confidence: number;
@@ -140,7 +40,7 @@ export interface InboxJob {
   userId: string;
   conversationId?: string;
   service: string;
-  action: string;
+  tool: string;
   status: 'pending' | 'completed' | 'failed';
   request: Record<string, unknown>;
   response?: Record<string, unknown>;
@@ -220,7 +120,7 @@ export interface Message {
 
 export interface MessageMetadata {
   serviceUsed?: string;
-  actionInvoked?: string;
+  toolInvoked?: string;
   routingConfidence?: number;
   processingTimeMs?: number;
 }
@@ -455,11 +355,12 @@ export interface MCPServerConfig {
 }
 
 /**
- * MCP Registry Entry (extends ServiceRegistryEntry for MCP services)
+ * MCP Service Registry Entry
  */
 export interface MCPServiceRegistryEntry extends Omit<ServiceRegistryEntry, 'capabilities'> {
   protocol: 'mcp';
   protocolVersion: string;
+  mcpEndpoint?: string;
   mcpCapabilities?: MCPServerCapabilities;
   tools?: MCPTool[];
   resources?: MCPResource[];
@@ -467,13 +368,11 @@ export interface MCPServiceRegistryEntry extends Omit<ServiceRegistryEntry, 'cap
 }
 
 /**
- * Conversion helpers for YWAIP <-> MCP migration
+ * MCP Request Context
  */
-export interface YWAIPToMCPMapping {
-  // Maps YWAIP action name to MCP tool name
-  actionToTool: (actionName: string) => string;
-  // Maps YWAIP parameter to MCP JSON Schema property
-  parameterToSchema: (param: YWAIPParameter) => MCPJsonSchemaProperty;
-  // Maps MCP tool result to YWAIP response
-  toolResultToResponse: (result: MCPToolsCallResult) => YWAIPInvokeResponse;
+export interface MCPRequestContext {
+  userId?: string;
+  scopes?: string[];
+  requestId?: string;
+  utcOffsetMinutes?: number;
 }
