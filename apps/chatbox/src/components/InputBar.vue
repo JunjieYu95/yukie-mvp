@@ -205,9 +205,9 @@ onMounted(() => {
   }
 }
 
-/* Hide some tool buttons on very small screens */
+/* On very small screens, show only essential buttons */
 @media (max-width: 400px) {
-  .tool-row {
+  .tool-row .tool-button:not(.essential) {
     display: none;
   }
 }

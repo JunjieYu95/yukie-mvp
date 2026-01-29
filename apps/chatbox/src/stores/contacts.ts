@@ -31,13 +31,13 @@ const seedContacts: Contact[] = [
     avatarUrl: '/icons/yukie-avatar.png',
   },
   {
-    id: 'habit-tracker',
-    name: 'Habit Tracker',
-    subtitle: 'Streaks · Check-ins',
+    id: 'diary-analyzer',
+    name: 'Diary Analyzer',
+    subtitle: 'Activity logging · Calendar',
     type: 'service',
     status: 'online',
     unreadCount: 0,
-    accent: '#f97316',
+    accent: '#8b5cf6',
   },
   {
     id: 'early-wakeup',
@@ -56,6 +56,50 @@ const seedContacts: Contact[] = [
     status: 'online',
     unreadCount: 0,
     accent: '#22c55e',
+  },
+];
+
+// Available public MCP services that can be added
+export const availableMCPServices: Omit<Contact, 'unreadCount' | 'lastMessage' | 'lastMessageAt'>[] = [
+  {
+    id: 'gmail-mcp',
+    name: 'Gmail',
+    subtitle: 'Email management',
+    type: 'service',
+    status: 'online',
+    accent: '#ea4335',
+  },
+  {
+    id: 'calendar-mcp',
+    name: 'Google Calendar',
+    subtitle: 'Schedule & events',
+    type: 'service',
+    status: 'online',
+    accent: '#4285f4',
+  },
+  {
+    id: 'notion-mcp',
+    name: 'Notion',
+    subtitle: 'Notes & databases',
+    type: 'service',
+    status: 'online',
+    accent: '#000000',
+  },
+  {
+    id: 'slack-mcp',
+    name: 'Slack',
+    subtitle: 'Team messaging',
+    type: 'service',
+    status: 'online',
+    accent: '#4a154b',
+  },
+  {
+    id: 'github-mcp',
+    name: 'GitHub',
+    subtitle: 'Code & repos',
+    type: 'service',
+    status: 'online',
+    accent: '#24292e',
   },
 ];
 
@@ -108,6 +152,38 @@ export const useContactsStore = defineStore('contacts', () => {
     contact.status = status;
   }
 
+  function addContact(contact: Omit<Contact, 'unreadCount' | 'lastMessage' | 'lastMessageAt'>) {
+    // Check if contact already exists
+    if (contacts.value.find((c) => c.id === contact.id)) {
+      return false;
+    }
+    contacts.value.push({
+      ...contact,
+      unreadCount: 0,
+    });
+    return true;
+  }
+
+  function removeContact(contactId: string) {
+    // Don't allow removing Yukie
+    if (contactId === 'yukie') return false;
+
+    const index = contacts.value.findIndex((c) => c.id === contactId);
+    if (index === -1) return false;
+
+    // If removing the active contact, switch to Yukie
+    if (activeContactId.value === contactId) {
+      activeContactId.value = 'yukie';
+    }
+
+    contacts.value.splice(index, 1);
+    return true;
+  }
+
+  function hasContact(contactId: string) {
+    return contacts.value.some((c) => c.id === contactId);
+  }
+
   return {
     contacts,
     orderedContacts,
@@ -118,5 +194,8 @@ export const useContactsStore = defineStore('contacts', () => {
     incrementUnread,
     clearUnread,
     setStatus,
+    addContact,
+    removeContact,
+    hasContact,
   };
 });
