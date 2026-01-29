@@ -45,6 +45,12 @@ export interface InboxStats {
   failed: number;
 }
 
+export interface TranscriptionResponse {
+  text: string;
+  duration?: number;
+  language?: string;
+}
+
 // ============================================================================
 // HTTP Helpers
 // ============================================================================
@@ -122,6 +128,64 @@ export async function sendChatMessage(
     },
     token
   );
+}
+
+// ============================================================================
+// Voice Transcription API
+// ============================================================================
+
+export async function transcribeAudio(
+  audioBlob: Blob,
+  token?: string
+): Promise<TranscriptionResponse> {
+  const formData = new FormData();
+
+  // Determine file extension based on MIME type
+  let extension = 'webm';
+  if (audioBlob.type.includes('mp3') || audioBlob.type.includes('mpeg')) {
+    extension = 'mp3';
+  } else if (audioBlob.type.includes('wav')) {
+    extension = 'wav';
+  } else if (audioBlob.type.includes('m4a') || audioBlob.type.includes('mp4')) {
+    extension = 'm4a';
+  } else if (audioBlob.type.includes('ogg')) {
+    extension = 'ogg';
+  }
+
+  formData.append('audio', audioBlob, `recording.${extension}`);
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/transcribe`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  // Check if response is JSON before parsing
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new ApiError(
+      `Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`,
+      response.status
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new ApiError(
+      data.message || data.error || 'Transcription failed',
+      response.status,
+      data
+    );
+  }
+
+  return data as TranscriptionResponse;
 }
 
 // ============================================================================

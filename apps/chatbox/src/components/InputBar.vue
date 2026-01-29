@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import VoiceRecorder from './VoiceRecorder.vue';
 
 defineProps<{
   disabled?: boolean;
@@ -34,6 +35,23 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleTranscription(text: string) {
+  // Append transcribed text to input (with space if there's existing text)
+  if (inputText.value.trim()) {
+    inputText.value = inputText.value.trim() + ' ' + text;
+  } else {
+    inputText.value = text;
+  }
+  resizeTextarea();
+  // Focus the textarea so user can edit or send
+  textareaRef.value?.focus();
+}
+
+function handleVoiceError(message: string) {
+  console.error('Voice recording error:', message);
+  // Error is already shown by VoiceRecorder component
+}
+
 onMounted(() => {
   resizeTextarea();
 });
@@ -48,9 +66,11 @@ onMounted(() => {
       <button class="tool-button" :disabled="disabled" title="Attach file (coming soon)">
         📎
       </button>
-      <button class="tool-button" :disabled="disabled" title="Voice note (coming soon)">
-        🎙️
-      </button>
+      <VoiceRecorder
+        :disabled="disabled"
+        @transcription="handleTranscription"
+        @error="handleVoiceError"
+      />
     </div>
     <textarea
       ref="textareaRef"
