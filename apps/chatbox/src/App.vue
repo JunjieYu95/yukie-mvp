@@ -288,14 +288,26 @@ function handleAppInstalled() {
   font-family: 'Space Grotesk', 'IBM Plex Sans', 'Helvetica Neue', sans-serif;
   color: #0f172a;
   background: radial-gradient(circle at top left, #fef9c3 0%, #f8fafc 40%, #e2e8f0 100%);
+  /* Mobile-friendly font sizes */
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 :global(*) {
   box-sizing: border-box;
+  /* Prevent text selection on interactive elements for touch */
+  -webkit-tap-highlight-color: transparent;
+}
+
+:global(html) {
+  /* Prevent horizontal scroll */
+  overflow-x: hidden;
 }
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
   display: flex;
   flex-direction: column;
   --panel: #ffffff;
@@ -303,83 +315,195 @@ function handleAppInstalled() {
   --border: #e2e8f0;
   --ink: #0f172a;
   --muted: #64748b;
+  --primary: #0f766e;
+  --primary-light: #14b8a6;
+  --accent: #f97316;
+  /* Safe area insets for notched devices */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  /* Prevent content from going under system UI */
+  padding-top: var(--safe-area-top);
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
 }
 
 .top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: 60px;
+  gap: 12px;
+}
+
+@media (min-width: 981px) {
+  .top-bar {
+    padding: 16px 24px;
+    min-height: 72px;
+  }
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  min-width: 0; /* Allow shrinking */
+  flex-shrink: 1;
 }
 
 .brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #0f766e, #22c55e);
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--primary), #22c55e);
   color: #fff;
   display: grid;
   place-items: center;
   font-weight: 700;
+  font-size: 14px;
+}
+
+@media (min-width: 981px) {
+  .brand-mark {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
 }
 
 .brand-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (min-width: 981px) {
+  .brand-title {
+    font-size: 22px;
+  }
 }
 
 .brand-subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--muted);
+  display: none; /* Hide on mobile to save space */
+}
+
+@media (min-width: 600px) {
+  .brand-subtitle {
+    display: block;
+    font-size: 13px;
+  }
 }
 
 .mobile-toggle {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #fff;
   font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mobile-toggle:active {
+  background: var(--surface);
+  transform: scale(0.96);
 }
 
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   position: relative;
+  flex-shrink: 0;
+}
+
+@media (min-width: 981px) {
+  .top-actions {
+    gap: 12px;
+  }
 }
 
 .model-selector {
   position: relative;
+  display: none; /* Hide on small mobile */
+}
+
+@media (min-width: 480px) {
+  .model-selector {
+    display: block;
+  }
 }
 
 .model-button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
-  font-size: 13px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 36px;
+}
+
+@media (min-width: 981px) {
+  .model-button {
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+}
+
+.model-button:active {
+  transform: scale(0.98);
 }
 
 .model-label {
   color: var(--muted);
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .model-label {
+    display: inline;
+  }
 }
 
 .model-name {
   font-weight: 600;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 600px) {
+  .model-name {
+    max-width: none;
+  }
 }
 
 .model-arrow {
@@ -394,10 +518,23 @@ function handleAppInstalled() {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-  min-width: 220px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  min-width: 200px;
+  max-width: calc(100vw - 32px);
   z-index: 1000;
   overflow: hidden;
+  animation: dropdownFade 0.15s ease;
+}
+
+@keyframes dropdownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .model-option {
@@ -436,42 +573,88 @@ function handleAppInstalled() {
 }
 
 .inbox-toggle {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 981px) {
+  .inbox-toggle {
+    padding: 8px 16px;
+    font-size: 14px;
+    min-height: 40px;
+  }
+}
+
+.inbox-toggle:active {
+  transform: scale(0.96);
 }
 
 .inbox-toggle.active {
-  background: #0f766e;
+  background: var(--primary);
   color: #fff;
-  border-color: #0f766e;
+  border-color: var(--primary);
 }
 
 .user-info {
-  padding: 6px 12px;
+  padding: 6px 10px;
   background: #f1f5f9;
   border-radius: 8px;
+  display: none; /* Hide on mobile to save space */
+}
+
+@media (min-width: 600px) {
+  .user-info {
+    display: block;
+  }
 }
 
 .user-id {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
 }
 
+@media (min-width: 981px) {
+  .user-id {
+    font-size: 12px;
+  }
+}
+
 .auth-button {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border: none;
   border-radius: 10px;
-  background: #0f766e;
+  background: var(--primary);
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+@media (min-width: 981px) {
+  .auth-button {
+    padding: 8px 16px;
+    font-size: 14px;
+    min-height: 40px;
+  }
+}
+
+.auth-button:active {
+  transform: scale(0.96);
 }
 
 .auth-button.logout {
-  background: #f97316;
+  background: var(--accent);
 }
 
 .main-grid {
@@ -485,42 +668,96 @@ function handleAppInstalled() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
-  background: #0f172a;
+  gap: 12px;
+  padding: 10px 16px;
+  padding-left: calc(16px + var(--safe-area-left));
+  padding-right: calc(16px + var(--safe-area-right));
+  background: linear-gradient(135deg, #0f172a, #1e293b);
   color: #f8fafc;
-  font-size: 13px;
+  font-size: 12px;
+}
+
+@media (min-width: 600px) {
+  .install-banner {
+    padding: 12px 20px;
+    padding-left: calc(20px + var(--safe-area-left));
+    padding-right: calc(20px + var(--safe-area-right));
+    font-size: 13px;
+  }
 }
 
 .install-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.install-content strong {
+  font-size: 13px;
+}
+
+.install-content span {
+  opacity: 0.85;
+  font-size: 11px;
+}
+
+@media (min-width: 600px) {
+  .install-content strong {
+    font-size: 14px;
+  }
+  .install-content span {
+    font-size: 12px;
+  }
 }
 
 .install-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .install-button {
-  padding: 8px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
   border: none;
   background: #22c55e;
   color: #0f172a;
   font-weight: 600;
   cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  min-height: 36px;
+}
+
+@media (min-width: 600px) {
+  .install-button {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+.install-button:active {
+  transform: scale(0.96);
 }
 
 .install-dismiss {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(248, 250, 252, 0.4);
+  border: 1px solid rgba(248, 250, 252, 0.3);
   background: transparent;
   color: #f8fafc;
   cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.install-dismiss:active {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .main-grid.compact {
@@ -528,11 +765,12 @@ function handleAppInstalled() {
 }
 
 .contacts-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .panel-header {
@@ -663,28 +901,97 @@ function handleAppInstalled() {
 }
 
 @media (max-width: 980px) {
-  .install-banner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
   .contacts-panel {
     position: fixed;
-    top: 72px;
+    top: 60px; /* Match mobile header height */
     bottom: 0;
     left: 0;
-    width: 80%;
+    width: 85%;
     max-width: 320px;
     transform: translateX(-100%);
     z-index: 200;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .contacts-panel.open {
     transform: translateX(0);
-    box-shadow: 24px 0 40px rgba(15, 23, 42, 0.2);
+    box-shadow: 8px 0 32px rgba(15, 23, 42, 0.15);
   }
 
   .details-panel {
     display: none;
+  }
+}
+
+/* Tablet breakpoint */
+@media (max-width: 768px) {
+  .top-bar {
+    padding: 10px 12px;
+    min-height: 56px;
+  }
+
+  .brand {
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 10px;
+    font-size: 13px;
+  }
+
+  .brand-title {
+    font-size: 16px;
+  }
+}
+
+/* Small mobile breakpoint */
+@media (max-width: 480px) {
+  .install-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .install-actions {
+    justify-content: flex-end;
+  }
+
+  .top-actions {
+    gap: 6px;
+  }
+
+  .inbox-toggle {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .auth-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+/* Landscape mode on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .top-bar {
+    padding: 8px 16px;
+    min-height: 48px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+
+  .contacts-panel {
+    top: 48px;
   }
 }
 </style>

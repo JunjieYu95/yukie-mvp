@@ -118,26 +118,67 @@ function formatDate(dateString: string) {
 
 <style scoped>
 .inbox-panel {
-  width: 360px;
+  width: 100%;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--panel, #fff);
-  border-left: 1px solid var(--border, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+  max-height: 85vh;
+  max-height: 85dvh;
+  overflow: hidden;
+  animation: panelSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes panelSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (min-width: 981px) {
+  .inbox-panel {
+    border-radius: 0;
+    box-shadow: none;
+    max-height: none;
+    height: auto;
+    border-left: 1px solid var(--border, #e2e8f0);
+    animation: none;
+  }
 }
 
 .inbox-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border, #e2e8f0);
+  flex-shrink: 0;
+}
+
+@media (min-width: 600px) {
+  .inbox-header {
+    padding: 16px 20px;
+  }
 }
 
 .inbox-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--ink, #0f172a);
+}
+
+@media (min-width: 600px) {
+  .inbox-header h2 {
+    font-size: 18px;
+  }
 }
 
 .header-actions {
@@ -146,17 +187,29 @@ function formatDate(dateString: string) {
 }
 
 .refresh-button {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--border, #e2e8f0);
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: var(--muted, #64748b);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+@media (min-width: 600px) {
+  .refresh-button {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
 }
 
 .refresh-button:hover:not(:disabled) {
   background: #f1f5f9;
+}
+
+.refresh-button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .refresh-button:disabled {
@@ -168,13 +221,14 @@ function formatDate(dateString: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted, #64748b);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .close-button:hover {
@@ -182,10 +236,22 @@ function formatDate(dateString: string) {
   color: var(--ink, #0f172a);
 }
 
+.close-button:active {
+  transform: scale(0.94);
+}
+
 .inbox-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 600px) {
+  .inbox-content {
+    padding: 16px;
+  }
 }
 
 .loading-state,
@@ -195,113 +261,201 @@ function formatDate(dateString: string) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 200px;
+  min-height: 160px;
   text-align: center;
   color: var(--muted, #64748b);
+  padding: 20px;
 }
 
 .empty-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+@media (min-width: 600px) {
+  .empty-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
 }
 
 .empty-hint {
-  font-size: 13px;
+  font-size: 12px;
   color: #94a3b8;
   margin-top: 4px;
 }
 
+@media (min-width: 600px) {
+  .empty-hint {
+    font-size: 13px;
+  }
+}
+
 .error-state button {
   margin-top: 12px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   border: 1px solid #ef4444;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: #ef4444;
   cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.error-state button:active {
+  transform: scale(0.96);
 }
 
 .jobs-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+
+@media (min-width: 600px) {
+  .jobs-list {
+    gap: 12px;
+  }
 }
 
 .job-card {
-  padding: 14px;
+  padding: 12px;
   background: #f9fafb;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+@media (min-width: 600px) {
+  .job-card {
+    padding: 14px;
+  }
 }
 
 .job-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+@media (min-width: 600px) {
+  .job-header {
+    margin-bottom: 8px;
+  }
 }
 
 .job-service {
   font-weight: 600;
   color: #333;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 600px) {
+  .job-service {
+    font-size: 14px;
+  }
 }
 
 .job-status {
   padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+@media (min-width: 600px) {
+  .job-status {
+    font-size: 11px;
+  }
 }
 
 .status-pending {
-  background: #fef3c7;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
   color: #92400e;
 }
 
 .status-completed {
-  background: #d1fae5;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
   color: #065f46;
 }
 
 .status-failed {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   color: #991b1b;
 }
 
 .job-action {
   color: #666;
-  font-size: 13px;
+  font-size: 12px;
   margin-bottom: 4px;
+  word-break: break-word;
+}
+
+@media (min-width: 600px) {
+  .job-action {
+    font-size: 13px;
+  }
 }
 
 .job-date {
   color: #999;
-  font-size: 12px;
+  font-size: 11px;
+}
+
+@media (min-width: 600px) {
+  .job-date {
+    font-size: 12px;
+  }
 }
 
 .job-result {
   margin-top: 10px;
   padding: 10px;
   background: #fff;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid #e5e7eb;
+  overflow: hidden;
 }
 
 .job-result pre {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  line-height: 1.4;
+}
+
+@media (min-width: 600px) {
+  .job-result pre {
+    font-size: 11px;
+  }
 }
 
 .job-error {
   margin-top: 10px;
   padding: 10px;
-  background: #fef2f2;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-radius: 8px;
   color: #dc2626;
-  font-size: 13px;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+@media (min-width: 600px) {
+  .job-error {
+    font-size: 13px;
+  }
 }
 </style>

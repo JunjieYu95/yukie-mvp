@@ -21,17 +21,36 @@ defineProps<{
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (min-width: 600px) {
+  .message-list {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 981px) {
+  .message-list {
+    gap: 16px;
+  }
 }
 
 .message-enter-active,
 .message-leave-active {
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.message-enter-from,
+.message-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
 .message-leave-to {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(-6px);
 }
 </style>

@@ -67,12 +67,39 @@ const actionDisplayName = computed(() => {
 
 <style scoped>
 .message-bubble {
-  max-width: 80%;
-  padding: 12px 16px;
+  max-width: 85%;
+  padding: 10px 14px;
   border-radius: 18px;
   word-wrap: break-word;
+  overflow-wrap: break-word;
   position: relative;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  animation: messageSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 600px) {
+  .message-bubble {
+    max-width: 80%;
+    padding: 12px 16px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (min-width: 981px) {
+  .message-bubble {
+    max-width: 75%;
+  }
 }
 
 .user-message {
@@ -80,92 +107,191 @@ const actionDisplayName = computed(() => {
   background: linear-gradient(135deg, #0f766e, #14b8a6);
   color: #f8fafc;
   border-bottom-right-radius: 6px;
+  margin-left: 15%;
+}
+
+@media (min-width: 600px) {
+  .user-message {
+    margin-left: 20%;
+  }
 }
 
 .assistant-message {
   align-self: flex-start;
-  background: #f8fafc;
+  background: #ffffff;
   color: #0f172a;
   border-bottom-left-radius: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  margin-right: 15%;
+}
+
+@media (min-width: 600px) {
+  .assistant-message {
+    margin-right: 20%;
+  }
 }
 
 .system-message {
   align-self: center;
-  background: #fef3c7;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
   color: #92400e;
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
   max-width: 90%;
   box-shadow: none;
+  padding: 8px 14px;
+  border-radius: 12px;
+}
+
+@media (min-width: 600px) {
+  .system-message {
+    font-size: 13px;
+    padding: 10px 16px;
+  }
 }
 
 .message-bubble.error {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
   color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .message-bubble.sending {
   opacity: 0.7;
+  animation: messagePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes messagePulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .message-content {
   white-space: pre-wrap;
   line-height: 1.5;
-  font-size: 15px;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+@media (min-width: 600px) {
+  .message-content {
+    font-size: 15px;
+  }
+}
+
+/* Handle code blocks and pre tags */
+.message-content :deep(pre),
+.message-content :deep(code) {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 6px;
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: 10px;
+  opacity: 0.75;
   flex-wrap: wrap;
+}
+
+@media (min-width: 600px) {
+  .message-meta {
+    gap: 8px;
+    font-size: 11px;
+  }
 }
 
 .user-message .message-meta {
   justify-content: flex-end;
 }
 
+.message-time {
+  font-weight: 500;
+}
+
 .status-sending {
   font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-sending::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: sendingDot 1s ease-in-out infinite;
+}
+
+@keyframes sendingDot {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .status-error {
   color: #ef4444;
+  font-weight: 500;
 }
 
 .service-badge {
-  padding: 2px 8px;
+  padding: 2px 6px;
   background: rgba(15, 118, 110, 0.12);
-  border: 1px solid rgba(15, 118, 110, 0.28);
-  border-radius: 4px;
-  font-size: 10px;
+  border: 1px solid rgba(15, 118, 110, 0.25);
+  border-radius: 6px;
+  font-size: 9px;
   text-transform: uppercase;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: #0f766e;
 }
 
+@media (min-width: 600px) {
+  .service-badge {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+}
+
 .action-badge {
-  padding: 2px 8px;
-  background: rgba(15, 23, 42, 0.08);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  border-radius: 4px;
-  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 6px;
+  font-size: 9px;
   text-transform: capitalize;
   color: #475569;
 }
 
+@media (min-width: 600px) {
+  .action-badge {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+}
+
 .user-message .service-badge {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .user-message .action-badge {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
 }
 </style>
