@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Contact } from '../stores/contacts';
+import AddMCPPanel from './AddMCPPanel.vue';
 
 const props = defineProps<{
   contacts: Contact[];
@@ -12,6 +13,11 @@ const emit = defineEmits<{
 }>();
 
 const query = ref('');
+const showAddMCP = ref(false);
+
+function toggleAddMCP() {
+  showAddMCP.value = !showAddMCP.value;
+}
 
 const filteredContacts = computed(() => {
   const needle = query.value.trim().toLowerCase();
@@ -53,8 +59,18 @@ function timeLabel(date?: Date) {
         placeholder="Search contacts"
         class="search-input"
       />
-      <button class="new-contact" title="Add contact (coming soon)">+</button>
+      <button
+        class="new-contact"
+        :class="{ active: showAddMCP }"
+        title="Add MCP service"
+        @click="toggleAddMCP"
+      >
+        +
+      </button>
     </div>
+
+    <!-- Add MCP Panel -->
+    <AddMCPPanel v-if="showAddMCP" @close="showAddMCP = false" />
 
     <div class="contact-scroll">
       <button
@@ -171,6 +187,13 @@ function timeLabel(date?: Date) {
 .new-contact:active {
   transform: scale(0.94);
   background: rgba(15, 118, 110, 0.12);
+}
+
+.new-contact.active {
+  background: linear-gradient(135deg, var(--primary, #0f766e), #14b8a6);
+  color: white;
+  border-style: solid;
+  transform: rotate(45deg);
 }
 
 .contact-scroll {

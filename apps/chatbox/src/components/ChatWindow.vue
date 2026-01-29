@@ -88,12 +88,12 @@ function handleClear() {
           </li>
         </ul>
         <!-- Service-specific suggestions -->
-        <ul v-else-if="props.contact?.id === 'habit-tracker'" class="suggestions">
-          <li @click="handleSend('Check me in for today')">
-            🌅 Check me in for today
+        <ul v-else-if="props.contact?.id === 'diary-analyzer'" class="suggestions">
+          <li @click="handleSend('Log that I spent 1 hour reading')">
+            📖 Log an activity
           </li>
-          <li @click="handleSend('Show my current streaks')">
-            🔥 Show my current streaks
+          <li @click="handleSend('Add a highlight: completed a big task')">
+            ⭐ Add a highlight
           </li>
         </ul>
         <ul v-else-if="props.contact?.id === 'momentum'" class="suggestions">
