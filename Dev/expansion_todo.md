@@ -1,8 +1,14 @@
 # Yukie Assistant Expansion TODO
 
-**Version:** 1.0  
-**Date:** January 25, 2026  
-**Status:** Planning Phase
+**Version:** 1.1  
+**Date:** January 28, 2026  
+**Status:** In Progress - Phase 1 Complete (MCP Integration)
+
+## Recent Updates (Jan 28, 2026)
+- ✅ Completed DiaryAnalyzer MCP integration with smart logging (category inference, time inference, timezone support)
+- ✅ Completed Workstyle MCP integration
+- ✅ Improved Yukie routing with better service descriptions
+- 🔄 In Progress: Mobile UI improvements, voice input activation, concurrent messaging
 
 ---
 
@@ -200,7 +206,7 @@ Integrate OpenAI Whisper API for voice-to-text functionality, enabling users to 
 
 ### 2.3 Frontend Implementation
 
-- [ ] **Audio Recording Component**
+- [ ] **Audio Recording Component** (HIGH PRIORITY - Voice button currently inactive)
   - [ ] Create `apps/chatbox/src/components/VoiceRecorder.vue`
   - [ ] Implement browser MediaRecorder API
   - [ ] Add recording controls (start, stop, pause, resume)
@@ -208,6 +214,7 @@ Integrate OpenAI Whisper API for voice-to-text functionality, enabling users to 
   - [ ] Add recording duration display
   - [ ] Handle browser permissions (microphone access)
   - [ ] Add error handling for unsupported browsers
+  - [ ] Connect to existing voice button in InputBar.vue
 
 - [ ] **Audio Upload & Transcription**
   - [ ] Implement audio file upload to `/api/transcribe`
@@ -277,11 +284,12 @@ Transform Yukie into a modern, responsive messenger-style app with PWA support, 
 
 ### 3.1 Responsive Design & PWA
 
-- [ ] **Responsive Layout**
-  - [ ] Audit current UI for mobile responsiveness
-  - [ ] Implement mobile-first CSS approach
+- [x] **Responsive Layout**
+  - [x] Audit current UI for mobile responsiveness (found issues: components overflow screen)
+  - [ ] Implement mobile-first CSS approach using standard UI frameworks (Tailwind CSS, Vuetify, or Quasar)
   - [ ] Add breakpoints for tablet and mobile
   - [ ] Optimize touch targets (min 44x44px)
+  - [ ] Fix components that go beyond screen boundaries
   - [ ] Test on various screen sizes (320px to 4K)
 
 - [ ] **Mobile Navigation**
@@ -298,6 +306,7 @@ Transform Yukie into a modern, responsive messenger-style app with PWA support, 
   - [ ] Add "Add to Home Screen" prompt
   - [ ] Configure app name, short name, theme color
   - [ ] Add splash screens for iOS/Android
+  - [ ] Use standard PWA tools/frameworks for better mobile experience (Vite PWA plugin, Workbox)
 
 - [ ] **Service Worker**
   - [ ] Implement caching strategy (cache-first, network-first, stale-while-revalidate)
@@ -412,6 +421,9 @@ Transform Yukie into a modern, responsive messenger-style app with PWA support, 
   - [ ] Implement polling or WebSocket for status updates
   - [ ] Show notification when response is ready
   - [ ] Auto-navigate to thread when response arrives (optional)
+  - [ ] **Enable concurrent message input** - Allow user to type and send new messages while previous message is still processing
+  - [ ] Queue multiple pending messages properly
+  - [ ] Show multiple "processing" indicators for concurrent requests
 
 - [ ] **Message History**
   - [ ] Implement message persistence
@@ -433,10 +445,12 @@ Transform Yukie into a modern, responsive messenger-style app with PWA support, 
   - [ ] Enhance `InputBar.vue` for messenger style
   - [ ] Add emoji picker
   - [ ] Add file attachment button
-  - [ ] Add voice recording button (from Section 2)
+  - [x] Add voice recording button UI (currently inactive - needs implementation)
+  - [ ] **Activate voice input button** - Implement voice recording functionality (see Section 2)
   - [ ] Add send button styling
   - [ ] Add character count (optional)
   - [ ] Add input auto-resize
+  - [ ] **Enable concurrent messaging** - Allow typing new message while previous message is still being processed
 
 - [ ] **Animations & Transitions**
   - [ ] Add smooth page transitions
@@ -473,37 +487,44 @@ Upgrade existing apps (DiaryAnalyzer, ideas_log, workstyle) to be accessible via
 
 ### 4.1 DiaryAnalyzer Integration
 
-- [ ] **App Analysis**
-  - [ ] Review DiaryAnalyzer codebase structure
-  - [ ] Identify core functionality and data models
-  - [ ] List existing APIs/endpoints
-  - [ ] Document data access patterns
+- [x] **App Analysis**
+  - [x] Review DiaryAnalyzer codebase structure
+  - [x] Identify core functionality and data models
+  - [x] List existing APIs/endpoints
+  - [x] Document data access patterns
 
-- [ ] **MCP Server Implementation**
-  - [ ] Create `packages/services/diary-analyzer/` package
-  - [ ] Implement MCP server wrapper
-  - [ ] Define MCP tools for diary operations:
-    - [ ] `analyze_entry` - Analyze a diary entry
-    - [ ] `get_insights` - Get insights from diary entries
-    - [ ] `search_entries` - Search diary entries
-    - [ ] `create_entry` - Create new diary entry
-    - [ ] `update_entry` - Update existing entry
-    - [ ] `get_entry` - Get specific entry
-    - [ ] `get_statistics` - Get diary statistics
-  - [ ] Implement tool handlers
-  - [ ] Add authentication/authorization
-  - [ ] Add error handling
+- [x] **MCP Server Implementation**
+  - [x] Create MCP server at `api/mcp/index.js` (standalone service)
+  - [x] Implement MCP server wrapper
+  - [x] Define MCP tools for diary operations:
+    - [x] `diary.log` - Log activity to Google Calendar with smart time inference
+    - [x] `diary.logHighlight` - Log highlights/milestones
+    - [x] `diary.listCalendars` - List available calendars
+    - [x] `diary.queryEvents` - Query calendar events
+  - [x] Implement tool handlers with category inference (prod/nonprod/admin)
+  - [x] Add smart time inference (last event end → current time)
+  - [x] Add flexible time parsing (2:30pm, 14:30, now)
+  - [x] Add proper timezone handling using UTC offset
+  - [x] Add error handling
 
 - [ ] **Data Migration**
-  - [ ] Plan data migration strategy (if needed)
-  - [ ] Ensure data compatibility
-  - [ ] Add data validation
+  - [x] Plan data migration strategy (using existing Google Calendar)
+  - [x] Ensure data compatibility
+  - [x] Add data validation
 
-- [ ] **Testing**
-  - [ ] Test MCP server connection
-  - [ ] Test all tool invocations
-  - [ ] Test error scenarios
-  - [ ] Test with Yukie integration
+- [x] **Testing**
+  - [x] Test MCP server connection
+  - [x] Test all tool invocations
+  - [x] Test error scenarios
+  - [x] Test with Yukie integration
+
+- [ ] **Interactive Responses & Artifacts**
+  - [ ] Add artifact/image support to diary.log responses
+  - [ ] Implement `diary.getDistribution` tool that returns today's activity distribution chart
+  - [ ] Generate visualizations (pie chart, bar chart) for activity categories
+  - [ ] Return images as MCP artifacts in chatbox
+  - [ ] Test image rendering in chatbox UI
+  - [ ] Example: "Show me today's log distribution" → returns pie chart image
 
 ### 4.2 Ideas Log Integration
 
@@ -542,56 +563,48 @@ Upgrade existing apps (DiaryAnalyzer, ideas_log, workstyle) to be accessible via
 
 ### 4.3 Workstyle Integration
 
-- [ ] **App Analysis**
-  - [ ] Review workstyle codebase structure
-  - [ ] Identify core functionality and data models
-  - [ ] List existing APIs/endpoints
-  - [ ] Document data access patterns
-  - [ ] Note: This appears to be Python-based, may need different approach
+- [x] **App Analysis**
+  - [x] Review workstyle codebase structure
+  - [x] Identify core functionality and data models
+  - [x] List existing APIs/endpoints
+  - [x] Document data access patterns
+  - [x] Note: This appears to be Python-based, may need different approach
 
-- [ ] **MCP Server Implementation**
-  - [ ] Create `packages/services/workstyle/` package
-  - [ ] Decide on implementation approach:
-    - [ ] Option A: Rewrite in TypeScript/Node.js
-    - [ ] Option B: Create MCP wrapper around Python service (HTTP proxy)
-    - [ ] Option C: Use Python MCP server library
-  - [ ] Define MCP tools for workstyle operations:
-    - [ ] `add_entry` - Add work entry
-    - [ ] `update_entry` - Update work entry
-    - [ ] `get_entry` - Get specific entry
-    - [ ] `list_entries` - List entries with filters
-    - [ ] `get_statistics` - Get work statistics
-    - [ ] `chat` - Chat with workstyle assistant (if exists)
-  - [ ] Implement tool handlers
-  - [ ] Add authentication/authorization
-  - [ ] Add error handling
+- [x] **MCP Server Implementation**
+  - [x] Create MCP server at `api/mcp/index.py` (Python-based)
+  - [x] Decide on implementation approach: Option B - Create MCP wrapper around Python service (HTTP proxy)
+  - [x] Implement MCP server wrapper
+  - [x] Define MCP tools for workstyle operations
+  - [x] Implement tool handlers
+  - [x] Add authentication/authorization
+  - [x] Add error handling
 
 - [ ] **Data Migration**
-  - [ ] Plan data migration strategy (if needed)
-  - [ ] Ensure data compatibility
-  - [ ] Add data validation
+  - [x] Plan data migration strategy (using existing database)
+  - [x] Ensure data compatibility
+  - [x] Add data validation
 
-- [ ] **Testing**
-  - [ ] Test MCP server connection
-  - [ ] Test all tool invocations
-  - [ ] Test error scenarios
-  - [ ] Test with Yukie integration
+- [x] **Testing**
+  - [x] Test MCP server connection
+  - [x] Test all tool invocations
+  - [x] Test error scenarios
+  - [x] Test with Yukie integration
 
 ### 4.4 Service Registry Updates
 
-- [ ] **Registry Configuration**
-  - [ ] Add DiaryAnalyzer to `config/registry.yaml`
-  - [ ] Add ideas_log to `config/registry.yaml`
-  - [ ] Add workstyle to `config/registry.yaml`
-  - [ ] Configure service metadata (name, description, icon)
-  - [ ] Configure authentication/authorization
-  - [ ] Add service tags/categories
+- [x] **Registry Configuration**
+  - [x] Add DiaryAnalyzer to `packages/yukie-core/src/mcp-registry.ts`
+  - [ ] Add ideas_log to registry (not yet implemented)
+  - [x] Add workstyle to `packages/yukie-core/src/mcp-registry.ts`
+  - [x] Configure service metadata (name, description, capabilities)
+  - [x] Configure authentication/authorization
+  - [x] Add service tags/categories
 
-- [ ] **Yukie Integration**
-  - [ ] Test service discovery
-  - [ ] Test routing to new services
-  - [ ] Test tool invocation
-  - [ ] Add service-specific prompts/instructions
+- [x] **Yukie Integration**
+  - [x] Test service discovery
+  - [x] Test routing to new services (improved routing with better service descriptions)
+  - [x] Test tool invocation
+  - [x] Add service-specific prompts/instructions (category inference for diary.log)
 
 ### 4.5 Documentation
 
