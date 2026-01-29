@@ -38,6 +38,9 @@ export const useChatStore = defineStore('chat', () => {
     action?: string;
   } | null>(null);
 
+  // Target service for manual routing control
+  const targetService = ref<string | null>(null);
+
   const activeConversation = computed(() => {
     if (!activeConversationId.value) return null;
     return conversations.value.get(activeConversationId.value) || null;
@@ -127,14 +130,17 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
 
-    if (activeContact.type !== 'assistant') {
-      error.value = 'Direct service chat is coming soon';
-      return;
+    // Determine target service: use manual selection, or use contact ID for direct service chat
+    let effectiveTargetService = targetService.value;
+    if (!effectiveTargetService && activeContact.type === 'service') {
+      effectiveTargetService = activeContact.id;
     }
 
     error.value = null;
     isLoading.value = true;
-    processingStatus.value = { stage: 'routing' };
+    processingStatus.value = effectiveTargetService
+      ? { stage: 'fetching-actions', service: effectiveTargetService }
+      : { stage: 'routing' };
 
     // Add user message
     const userMessage = addMessage(
@@ -168,7 +174,8 @@ export const useChatStore = defineStore('chat', () => {
         content.trim(),
         conversationId,
         authStore.token!,
-        settingsStore.selectedModel
+        settingsStore.selectedModel,
+        effectiveTargetService || undefined
       );
 
       clearInterval(progressInterval);
@@ -265,6 +272,12 @@ export const useChatStore = defineStore('chat', () => {
     contactsStore.setActiveContact(contactId);
     const conversationId = conversationByContactId.value.get(contactId);
     activeConversationId.value = conversationId || null;
+    // Clear target service when switching contacts
+    targetService.value = null;
+  }
+
+  function setTargetService(serviceId: string | null) {
+    targetService.value = serviceId;
   }
 
   return {
@@ -275,10 +288,12 @@ export const useChatStore = defineStore('chat', () => {
     isLoading,
     error,
     processingStatus,
+    targetService,
     createConversation,
     addMessage,
     sendMessage,
     clearConversation,
     setActiveContact,
+    setTargetService,
   };
 });

@@ -20,6 +20,7 @@ export interface ChatRequest {
   message: string;
   conversationId?: string;
   model?: string;
+  targetService?: string; // Optional: bypass LLM routing and send directly to this service
 }
 
 export interface ChatResponse {

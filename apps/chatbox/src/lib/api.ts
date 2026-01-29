@@ -118,13 +118,14 @@ export async function sendChatMessage(
   message: string,
   conversationId?: string,
   token?: string,
-  model?: string
+  model?: string,
+  targetService?: string
 ): Promise<ChatResponse> {
   return request<ChatResponse>(
     '/chat',
     {
       method: 'POST',
-      body: JSON.stringify({ message, conversationId, model }),
+      body: JSON.stringify({ message, conversationId, model, targetService }),
     },
     token
   );
