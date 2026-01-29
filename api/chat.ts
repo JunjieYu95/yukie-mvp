@@ -200,12 +200,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         routingConfidence: result.routingConfidence,
       });
 
+      // Transform routingDetails to expected format
+      const routingDetails = result.routingDetails ? {
+        targetService: result.routingDetails.service || 'none',
+        tool: result.routingDetails.tool || 'none',
+        confidence: result.routingDetails.confidence,
+        reasoning: result.routingDetails.reasoning,
+      } : undefined;
+
       res.status(200).json({
         response: result.response,
         conversationId,
         serviceUsed: result.serviceUsed,
         actionInvoked: result.toolInvoked,
-        routingDetails: result.routingDetails,
+        routingDetails,
       });
     } else {
       // Fallback to direct LLM call (routing disabled)

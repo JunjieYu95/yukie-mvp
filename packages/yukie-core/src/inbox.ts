@@ -21,7 +21,7 @@ export interface CreateJobOptions {
   userId: string;
   conversationId?: string;
   service: string;
-  action: string;
+  tool: string;
   request: Record<string, unknown>;
 }
 
@@ -32,7 +32,7 @@ export function createJob(options: CreateJobOptions): InboxJob {
     userId: options.userId,
     conversationId: options.conversationId,
     service: options.service,
-    action: options.action,
+    tool: options.tool,
     status: 'pending',
     request: options.request,
     createdAt: now,
@@ -40,7 +40,7 @@ export function createJob(options: CreateJobOptions): InboxJob {
   };
 
   inboxStore.set(job.id, job);
-  logger.info('Job created', { jobId: job.id, service: job.service, action: job.action });
+  logger.info('Job created', { jobId: job.id, service: job.service, tool: job.tool });
 
   return job;
 }

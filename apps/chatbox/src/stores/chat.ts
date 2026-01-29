@@ -175,9 +175,16 @@ export const useChatStore = defineStore('chat', () => {
 
       // Update status with actual service info
       if (response.serviceUsed) {
+        // Map service IDs to friendly names
+        const serviceNameMap: Record<string, string> = {
+          'habit-tracker': 'Habit Tracker',
+          'momentum': 'Momentum',
+          'diary-analyzer': 'Diary Analyzer',
+          'workstyle': 'Workstyle',
+        };
         processingStatus.value = {
           stage: 'invoking',
-          service: response.serviceUsed,
+          service: serviceNameMap[response.serviceUsed] || response.serviceUsed,
           action: response.actionInvoked,
         };
       }
@@ -198,14 +205,20 @@ export const useChatStore = defineStore('chat', () => {
 
       // Show routing details if available
       if (response.routingDetails && response.routingDetails.targetService !== 'none') {
-        // Add a system message showing what happened
-        const serviceName = response.routingDetails.targetService === 'habit-tracker' 
-          ? 'Habit Tracker' 
-          : response.routingDetails.targetService;
+        // Map service IDs to friendly names
+        const serviceNameMap: Record<string, string> = {
+          'habit-tracker': 'Habit Tracker',
+          'momentum': 'Momentum',
+          'diary-analyzer': 'Diary Analyzer',
+          'workstyle': 'Workstyle',
+        };
+        const serviceName = serviceNameMap[response.routingDetails.targetService] || response.routingDetails.targetService;
+        const toolName = response.routingDetails.tool || response.actionInvoked;
+        
         addMessage(
           {
             role: 'system',
-            content: `✓ Routed to ${serviceName} (${Math.round(response.routingDetails.confidence * 100)}% confidence)${response.actionInvoked ? ` → ${response.actionInvoked}` : ''}`,
+            content: `✓ Routed to ${serviceName} (${Math.round(response.routingDetails.confidence * 100)}% confidence)${toolName && toolName !== 'none' ? ` → ${toolName}` : ''}`,
           },
           activeContact.id
         );

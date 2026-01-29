@@ -337,7 +337,10 @@ class MCPServiceRegistry {
       throw new Error(`MCP request failed: ${response.status} ${response.statusText}`);
     }
 
-    const jsonRpcResponse = await response.json();
+    const jsonRpcResponse = await response.json() as {
+      result?: T;
+      error?: { code: number; message: string };
+    };
 
     if (jsonRpcResponse.error) {
       throw new Error(jsonRpcResponse.error.message || 'MCP request failed');
@@ -416,20 +419,70 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
       {
         id: 'momentum',
         name: 'Momentum',
-        description: 'Log success or failure events to build momentum for daily habits.',
+        description: 'Binary success/failure tracking for daily habits. Use only when user explicitly says "I did it", "success", "I screwed it", or "failure" for habit outcomes. NOT for logging activities or time.',
         baseUrl: process.env.MOMENTUM_URL || 'https://momentum-mu-one.vercel.app',
         mcpEndpoint:
           process.env.MOMENTUM_MCP_URL ||
           `${process.env.MOMENTUM_URL || 'https://momentum-mu-one.vercel.app'}/api/mcp`,
         capabilities: [
           'momentum tracking',
-          'success log',
-          'failure log',
+          'success tracking',
+          'failure tracking',
           'habit outcome',
           'did it',
           'screwed it',
+          'binary outcome',
         ],
         scopes: [],
+        healthEndpoint: '/api/mcp',
+        enabled: true,
+      },
+      {
+        id: 'diary-analyzer',
+        name: 'Diary Analyzer',
+        description: 'Log activities to Google Calendar with time duration. Use for "log activity", "spent time on", "worked on", "did X for Y minutes/hours". Creates calendar events.',
+        baseUrl: process.env.DIARY_ANALYZER_URL || 'https://diary-analyzer-zeta.vercel.app',
+        mcpEndpoint:
+          process.env.DIARY_ANALYZER_MCP_URL ||
+          `${process.env.DIARY_ANALYZER_URL || 'https://diary-analyzer-zeta.vercel.app'}/api/mcp`,
+        capabilities: [
+          'log activity',
+          'activity logging',
+          'calendar events',
+          'time tracking',
+          'spent time',
+          'worked on',
+          'highlights',
+          'milestones',
+          'achievements',
+          'diary entry',
+        ],
+        scopes: ['diary:read', 'diary:write'],
+        healthEndpoint: '/api/mcp',
+        enabled: true,
+      },
+      {
+        id: 'workstyle',
+        name: 'Workstyle',
+        description: 'Track work tasks and time. Log task progress, take breaks, mark tasks complete, and visualize work timeline.',
+        baseUrl: process.env.WORKSTYLE_URL || 'https://workstyle-ten.vercel.app',
+        mcpEndpoint:
+          process.env.WORKSTYLE_MCP_URL ||
+          `${process.env.WORKSTYLE_URL || 'https://workstyle-ten.vercel.app'}/api/mcp`,
+        capabilities: [
+          'task tracking',
+          'work logging',
+          'time tracking',
+          'break management',
+          'task completion',
+          'gantt chart',
+          'project management',
+          'work on',
+          'start working',
+          'take a break',
+        ],
+        scopes: ['workstyle:read', 'workstyle:write'],
+        healthEndpoint: '/api/mcp',
         enabled: true,
       },
     ],

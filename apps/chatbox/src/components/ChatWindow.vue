@@ -75,13 +75,16 @@ function handleClear() {
         <p v-else>Yukie will soon let you chat with services directly.</p>
         <ul v-if="!isServiceContact" class="suggestions">
           <li @click="handleSend('Check me in for today')">
-            Check me in for today
+            🌅 Check me in for today
           </li>
-          <li @click="handleSend(`What's my current streak?`)">
-            What's my current streak?
+          <li @click="handleSend('Log that I spent 1 hour reading')">
+            📖 Log that I spent 1 hour reading
           </li>
-          <li @click="handleSend('How many days this month?')">
-            How many days this month?
+          <li @click="handleSend('Start working on my project')">
+            💼 Start working on my project
+          </li>
+          <li @click="handleSend('Add a highlight: finished a big task')">
+            ⭐ Add a highlight
           </li>
         </ul>
       </div>
@@ -98,12 +101,12 @@ function handleClear() {
               🔍 Finding the right service...
             </span>
             <span v-else-if="chatStore.processingStatus.stage === 'fetching-actions'" class="status-text">
-              📋 Getting actions from <strong>{{ chatStore.processingStatus.service === 'habit-tracker' ? 'Habit Tracker' : chatStore.processingStatus.service || 'service' }}</strong>...
+              📋 Getting actions from <strong>{{ chatStore.processingStatus.service || 'service' }}</strong>...
             </span>
             <span v-else-if="chatStore.processingStatus.stage === 'invoking'" class="status-text">
-              ⚡ Calling <strong>{{ chatStore.processingStatus.service === 'habit-tracker' ? 'Habit Tracker' : chatStore.processingStatus.service || 'service' }}</strong>
+              ⚡ Calling <strong>{{ chatStore.processingStatus.service || 'service' }}</strong>
               <span v-if="chatStore.processingStatus.action" class="action-name">
-                ({{ chatStore.processingStatus.action }})
+                → {{ chatStore.processingStatus.action }}
               </span>
             </span>
             <span v-else class="status-text">

@@ -12,6 +12,7 @@ export interface ChatResponse {
   actionInvoked?: string;
   routingDetails?: {
     targetService: string;
+    tool?: string;
     confidence: number;
     reasoning: string;
   };
