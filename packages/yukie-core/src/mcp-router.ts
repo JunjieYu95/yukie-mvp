@@ -295,6 +295,34 @@ export async function selectToolParameters(
         .join('\n')
     : '  (no parameters)';
 
+  // Check if this tool has a category parameter for activity logging
+  const hasCategory = schema.properties && 'category' in schema.properties;
+  
+  // Build category inference instructions if needed
+  let categoryInstructions = '';
+  if (hasCategory && tool.name === 'diary.log') {
+    categoryInstructions = `
+CATEGORY INFERENCE (IMPORTANT):
+The 'category' parameter is REQUIRED and must be inferred from the activity title:
+- "prod" (Productive): coding, programming, work, meetings, learning, studying, reading educational content, projects, exercise, writing, research
+- "nonprod" (Non-productive): gaming, watching TV/movies/YouTube, social media, browsing, entertainment, leisure activities, hanging out
+- "admin" (Admin/Rest): meals, eating, cooking, sleeping, napping, rest, shower, commute, errands, chores, routine tasks, breaks
+
+Examples:
+- "vibe coding" → category: "prod"
+- "watching Netflix" → category: "nonprod"  
+- "lunch" → category: "admin"
+- "reading a novel" → category: "nonprod" (leisure reading)
+- "reading documentation" → category: "prod" (work/learning)
+- "gym workout" → category: "prod"
+- "taking a shower" → category: "admin"
+
+If the activity is ambiguous (could fit multiple categories), include "categoryConfidence": "low" in your response.
+Otherwise include "categoryConfidence": "high".
+
+`;
+  }
+
   const prompt = `You are a parameter extractor. Given a user message and a tool, extract the parameter values.
 
 Tool: ${tool.name}
@@ -303,21 +331,27 @@ Parameters:
 ${params}
 
 User message: "${userMessage}"
-
+${categoryInstructions}
 Rules:
 - Only include date/month parameters if the user explicitly specifies an absolute date or month (e.g., YYYY-MM-DD or YYYY-MM).
 - If the user says "today", "yesterday", "this week", or "this month", omit date/month parameters and let the server resolve them.
 - Use reasonable defaults for optional parameters.
 - For dates, use ISO format (YYYY-MM-DD).
 - For boolean parameters, infer from context (e.g., "check in" implies checked=true).
+- For time parameters, extract exact times if specified (e.g., "from 2pm to 3pm" → startTime: "2pm", endTime: "3pm").
+- If time is not specified, omit time parameters to let the server use smart defaults.
 
 Respond ONLY with valid JSON:
 {
-  "args": { <parameter-values> }
+  "args": { <parameter-values> },
+  "categoryConfidence": "high" or "low" (only for diary.log)
 }`;
 
   try {
-    const { result, error } = await completeWithJSON<{ args: Record<string, unknown> }>(
+    const { result, error } = await completeWithJSON<{ 
+      args: Record<string, unknown>;
+      categoryConfidence?: 'high' | 'low';
+    }>(
       [{ role: 'user', content: prompt }],
       {
         temperature: 0.1,
@@ -331,9 +365,15 @@ Respond ONLY with valid JSON:
       return null;
     }
 
+    // If category confidence is low, add it to args so the MCP service can handle follow-up
+    const args = { ...result.args };
+    if (result.categoryConfidence === 'low' && tool.name === 'diary.log') {
+      args._categoryConfidence = 'low';
+    }
+
     return {
       toolName: tool.name,
-      args: result.args,
+      args,
     };
   } catch (error) {
     logger.error('Parameter extraction error', error);
