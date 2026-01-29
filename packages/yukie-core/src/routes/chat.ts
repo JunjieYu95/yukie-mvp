@@ -71,6 +71,7 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
       userId: req.auth.userId,
       conversationId: body.conversationId,
       messageLength: body.message.length,
+      targetService: body.targetService,
     });
 
     // Process the message using MCP router
@@ -79,6 +80,7 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
       auth: req.auth,
       conversationId: body.conversationId,
       model: body.model,
+      targetService: body.targetService,
     });
 
     const timing = timer();

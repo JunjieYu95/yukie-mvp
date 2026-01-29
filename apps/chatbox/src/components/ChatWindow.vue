@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick } from 'vue';
 import { useChatStore } from '../stores/chat';
 import MessageList from './MessageList.vue';
 import InputBar from './InputBar.vue';
@@ -17,7 +17,7 @@ const emit = defineEmits<{
   back: [];
 }>();
 
-const isServiceContact = computed(() => props.contact?.type === 'service');
+// Service contacts now support direct chat
 
 // Auto-scroll to bottom when new messages arrive
 watch(
@@ -70,10 +70,10 @@ function handleClear() {
 
       <div v-if="chatStore.messages.length === 0" class="empty-state">
         <div class="empty-icon">💬</div>
-        <h3>{{ isServiceContact ? 'Direct chat coming soon' : 'Start a conversation' }}</h3>
-        <p v-if="!isServiceContact">Ask me anything! Try:</p>
-        <p v-else>Yukie will soon let you chat with services directly.</p>
-        <ul v-if="!isServiceContact" class="suggestions">
+        <h3>Start a conversation</h3>
+        <p v-if="props.contact?.type === 'assistant'">Ask me anything! Try:</p>
+        <p v-else>Chat directly with {{ props.contact?.name }}:</p>
+        <ul v-if="props.contact?.type === 'assistant'" class="suggestions">
           <li @click="handleSend('Check me in for today')">
             🌅 Check me in for today
           </li>
@@ -85,6 +85,28 @@ function handleClear() {
           </li>
           <li @click="handleSend('Add a highlight: finished a big task')">
             ⭐ Add a highlight
+          </li>
+        </ul>
+        <!-- Service-specific suggestions -->
+        <ul v-else-if="props.contact?.id === 'habit-tracker'" class="suggestions">
+          <li @click="handleSend('Check me in for today')">
+            🌅 Check me in for today
+          </li>
+          <li @click="handleSend('Show my current streaks')">
+            🔥 Show my current streaks
+          </li>
+        </ul>
+        <ul v-else-if="props.contact?.id === 'momentum'" class="suggestions">
+          <li @click="handleSend('Did it!')">
+            ✅ Did it!
+          </li>
+          <li @click="handleSend('Screwed it')">
+            ❌ Screwed it
+          </li>
+        </ul>
+        <ul v-else class="suggestions">
+          <li @click="handleSend('Help')">
+            ❓ What can you do?
           </li>
         </ul>
       </div>
@@ -122,7 +144,7 @@ function handleClear() {
     </div>
 
     <InputBar
-      :disabled="chatStore.isLoading || isServiceContact"
+      :disabled="chatStore.isLoading"
       @send="handleSend"
     />
   </div>

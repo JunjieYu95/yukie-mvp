@@ -39,22 +39,30 @@ interface RoutingResult {
 
 export async function routeToTool(
   userMessage: string,
-  model?: string
+  model?: string,
+  targetService?: string
 ): Promise<RoutingResult> {
   const registry = getMCPRegistry();
-  const services = registry.getEnabled();
+  const allServices = registry.getEnabled();
+
+  // Filter services if targetService is specified
+  const services = targetService
+    ? allServices.filter((s) => s.id === targetService)
+    : allServices;
 
   if (services.length === 0) {
     return {
       selectedTool: null,
       confidence: 1.0,
-      reasoning: 'No services are currently available',
+      reasoning: targetService
+        ? `Target service '${targetService}' is not available`
+        : 'No services are currently available',
     };
   }
 
   const timer = startTimer();
 
-  // Gather all tools from all services
+  // Gather tools from filtered services (or all if no target)
   const allTools: ToolWithService[] = [];
   for (const service of services) {
     const tools = await registry.fetchTools(service.id);
@@ -390,6 +398,7 @@ export interface MCPChatFlowOptions {
   auth: AuthContext;
   conversationId?: string;
   model?: string;
+  targetService?: string; // Optional: bypass LLM routing and send directly to this service
 }
 
 export interface MCPChatFlowResult {
@@ -406,10 +415,10 @@ export interface MCPChatFlowResult {
 }
 
 export async function processMCPChatMessage(options: MCPChatFlowOptions): Promise<MCPChatFlowResult> {
-  const { message, auth, model } = options;
+  const { message, auth, model, targetService } = options;
 
-  // Step 1: Route to the best tool
-  const routing = await routeToTool(message, model);
+  // Step 1: Route to the best tool (with optional direct service targeting)
+  const routing = await routeToTool(message, model, targetService);
 
   // Step 2: Handle routing result
   if (!routing.selectedTool || routing.confidence < 0.5) {
