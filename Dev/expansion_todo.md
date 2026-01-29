@@ -384,6 +384,18 @@ Transform Yukie into a modern, responsive messenger-style app with PWA support, 
   - [ ] Add "Add Service" button/flow
   - [ ] Show service capabilities/tools before adding
 
+- [ ] **Claude Desktop MCP Integration**
+  - [ ] Research Claude Desktop MCP configuration format
+  - [ ] Understand how Claude Desktop exposes MCP servers
+  - [ ] Design connection method (API, config file sync, or proxy)
+  - [ ] Test connecting to Claude Desktop's MCP servers
+  - [ ] Implement MCP server discovery from Claude Desktop
+  - [ ] Add UI to connect/disconnect Claude Desktop MCP servers
+  - [ ] Auto-discover and add MCP servers configured in Claude Desktop
+  - [ ] Handle authentication/credentials for Claude Desktop MCP servers
+  - [ ] Test accessing extra MCP servers through Claude account connection
+  - [ ] Document how to configure Claude Desktop MCP servers for Yukie access
+
 ### 3.4 Asynchronous Messaging
 
 - [ ] **Message Queue System**
