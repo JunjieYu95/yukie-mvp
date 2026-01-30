@@ -16,9 +16,10 @@ interface TranscriptionResponse {
 // ============================================================================
 
 async function transcribeWithWhisper(audioBuffer: Buffer, fileName: string): Promise<TranscriptionResponse> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  // OPENAI_API_KEY required for Whisper; LLM_API_KEY fallback when using OpenAI as LLM provider
+  const apiKey = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
+    throw new Error('OPENAI_API_KEY or LLM_API_KEY environment variable is not set');
   }
 
   const model = process.env.WHISPER_MODEL || 'whisper-1';

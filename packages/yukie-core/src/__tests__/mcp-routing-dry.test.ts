@@ -116,87 +116,87 @@ const TEST_CASES: TestCase[] = [
   },
 
   // ============================================================================
-  // GAMING & ENTERTAINMENT - NONPROD (11-20)
+  // GAMING & ENTERTAINMENT - ADMIN (regular leisure is normal rest!)
   // ============================================================================
   {
     id: 11,
     message: 'Log lanius run from 7pm to 7:30pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['lanius'],
-    description: 'Fallout game character run',
+    description: 'Fallout game character run (regular leisure)',
   },
   {
     id: 12,
     message: 'log playing Fallout 8pm to 10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['fallout'],
-    description: 'Playing specific game',
+    description: 'Playing specific game (regular leisure)',
   },
   {
     id: 13,
     message: 'Log gaming session from 9pm to 11pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['gaming'],
-    description: 'Generic gaming session',
+    description: 'Generic gaming session (regular leisure)',
   },
   {
     id: 14,
     message: 'log watching Netflix 7pm-9pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['netflix', 'watching'],
-    description: 'Streaming service',
+    description: 'Streaming service (regular leisure)',
   },
   {
     id: 15,
     message: 'Log YouTube from 6pm to 7pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['youtube'],
-    description: 'YouTube watching',
+    description: 'YouTube watching (regular leisure)',
   },
   {
     id: 16,
     message: 'log playing chess 2pm to 3pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['chess'],
-    description: 'Board game',
+    description: 'Board game (regular leisure)',
   },
   {
     id: 17,
     message: 'Log browsing Reddit 10pm to 11pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['reddit'],
-    description: 'Social media browsing',
+    description: 'Social media browsing (regular leisure)',
   },
   {
     id: 18,
     message: 'log movie night from 8pm to 10:30pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['movie'],
-    description: 'Movie watching',
+    description: 'Movie watching (regular leisure)',
   },
   {
     id: 19,
     message: 'Log Elden Ring playthrough 3pm-6pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['elden ring'],
-    description: 'Specific game title',
+    description: 'Specific game title (regular leisure)',
   },
   {
     id: 20,
     message: 'log scrolling Twitter from 9pm to 10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
+    expectedCategory: 'admin',
     expectedTitleContains: ['twitter'],
-    description: 'Social media scrolling',
+    description: 'Social media scrolling (regular leisure)',
   },
 
   // ============================================================================
@@ -428,8 +428,8 @@ const TEST_CASES: TestCase[] = [
     id: 48,
     message: 'did some gaming 8pm-10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Did some X format',
+    expectedCategory: 'admin',
+    description: 'Did some X format (regular leisure)',
   },
   {
     id: 49,
@@ -449,8 +449,8 @@ const TEST_CASES: TestCase[] = [
     id: 51,
     message: 'played video games from 9pm to 11pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Played X format',
+    expectedCategory: 'admin',
+    description: 'Played X format (regular leisure)',
   },
   {
     id: 52,
@@ -477,8 +477,8 @@ const TEST_CASES: TestCase[] = [
     id: 55,
     message: 'just finished gaming, started at 8pm ended at 10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Past tense with started/ended',
+    expectedCategory: 'admin',
+    description: 'Past tense gaming (regular leisure)',
   },
 
   // ============================================================================
@@ -495,8 +495,8 @@ const TEST_CASES: TestCase[] = [
     id: 57,
     message: 'log gaming',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Minimal - just activity',
+    expectedCategory: 'admin',
+    description: 'Minimal gaming (regular leisure)',
   },
   {
     id: 58,
@@ -509,8 +509,8 @@ const TEST_CASES: TestCase[] = [
     id: 59,
     message: 'log reading a novel 7pm to 9pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Leisure reading (novel)',
+    expectedCategory: 'admin',
+    description: 'Leisure reading (regular leisure)',
   },
   {
     id: 60,
@@ -530,8 +530,8 @@ const TEST_CASES: TestCase[] = [
     id: 62,
     message: 'log watching TV 8pm to 10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Generic TV watching',
+    expectedCategory: 'admin',
+    description: 'TV watching (regular leisure)',
   },
   {
     id: 63,
@@ -551,8 +551,8 @@ const TEST_CASES: TestCase[] = [
     id: 65,
     message: 'log gaming 21:00-23:00',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: '24-hour military time',
+    expectedCategory: 'admin',
+    description: 'Gaming in 24h format (regular leisure)',
   },
 
   // ============================================================================
@@ -569,8 +569,8 @@ const TEST_CASES: TestCase[] = [
     id: 67,
     message: 'log date night 7pm-10pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Social activity',
+    expectedCategory: 'admin',
+    description: 'Social activity (regular leisure)',
   },
   {
     id: 68,
@@ -583,8 +583,8 @@ const TEST_CASES: TestCase[] = [
     id: 69,
     message: 'log call with mom from 8pm to 9pm',
     expectedTool: 'diary.log',
-    expectedCategory: 'nonprod',
-    description: 'Personal call (social)',
+    expectedCategory: 'admin',
+    description: 'Personal call (regular social)',
   },
   {
     id: 70,
@@ -593,11 +593,55 @@ const TEST_CASES: TestCase[] = [
     expectedCategory: 'prod',
     description: 'Side project',
   },
+
+  // ============================================================================
+  // NONPROD CASES - Only with explicit regret/negativity (71-75)
+  // ============================================================================
+  {
+    id: 71,
+    message: 'log damn, wasted 3 hours on YouTube 8pm-11pm',
+    expectedTool: 'diary.log',
+    expectedCategory: 'nonprod',
+    description: 'Explicit regret with "damn" and "wasted"',
+  },
+  {
+    id: 72,
+    message: 'log ugh scrolled Twitter for too long 9pm-11pm',
+    expectedTool: 'diary.log',
+    expectedCategory: 'nonprod',
+    description: 'Explicit negativity with "ugh" and "too long"',
+  },
+  {
+    id: 73,
+    message: 'log unproductive gaming session 2pm-6pm',
+    expectedTool: 'diary.log',
+    expectedCategory: 'nonprod',
+    description: 'Explicit "unproductive" label',
+  },
+  {
+    id: 74,
+    message: 'log waste of time watching random videos 7pm-10pm',
+    expectedTool: 'diary.log',
+    expectedCategory: 'nonprod',
+    description: 'Explicit "waste of time"',
+  },
+  {
+    id: 75,
+    message: 'log unfortunately spent too much time browsing 6pm-9pm',
+    expectedTool: 'diary.log',
+    expectedCategory: 'nonprod',
+    description: 'Explicit "unfortunately" and "too much"',
+  },
 ];
 
 // ============================================================================
 // Category Keywords for Validation
 // ============================================================================
+
+// New category definitions:
+// - prod: Intentional productive activities (work, learning, exercise)
+// - admin: Regular life including leisure (entertainment, meals, rest, gaming - this is normal!)
+// - nonprod: ONLY when user expresses regret/negativity (wasted, damn, ugh, etc.)
 
 const CATEGORY_KEYWORDS = {
   prod: [
@@ -606,21 +650,24 @@ const CATEGORY_KEYWORDS = {
     'documentation', 'review', 'planning', 'client call', 'interview',
     'gym', 'workout', 'exercise', 'running', 'meditation', 'focus', 'deep work',
     'pair programming', 'tutorial', 'training', 'prep', '1:1', 'side project',
-    'vibe coding', 'reading', // default reading to prod (learning)
+    'vibe coding', 'reading', // reading defaults to productive (learning)
   ],
-  nonprod: [
-    'gaming', 'game', 'games', 'playing', 'netflix', 'youtube', 'movie',
-    'tv', 'reddit', 'twitter', 'social', 'browsing', 'scrolling', 'watching',
-    'fallout', 'elden ring', 'chess', 'novel', 'entertainment', 'lanius',
-    'date night', 'hangout', 'hanging out', 'video games',
-    // Personal calls (check before generic "call")
-    'call with mom', 'call with dad', 'call with friend', 'with mom', 'with dad',
-  ],
+  // nonprod is ONLY for activities with explicit regret/negativity (checked separately via sentiment)
+  nonprod: [],
+  // admin now includes ALL regular life activities including entertainment/leisure
   admin: [
+    // Meals & routine
     'lunch', 'dinner', 'breakfast', 'meal', 'eating', 'shower', 'nap',
     'sleep', 'rest', 'break', 'commute', 'grocery', 'shopping', 'cooking',
     'laundry', 'cleaning', 'chore', 'errand', 'appointment', 'doctor',
     'getting ready', 'walking the dog', 'pet',
+    // Entertainment & leisure (normal rest activities!)
+    'gaming', 'game', 'games', 'playing', 'netflix', 'youtube', 'movie',
+    'tv', 'reddit', 'twitter', 'social', 'browsing', 'scrolling', 'watching',
+    'fallout', 'elden ring', 'elden', 'chess', 'novel', 'entertainment', 'lanius',
+    'date night', 'hangout', 'hanging out', 'video games',
+    // Personal calls
+    'call with mom', 'call with dad', 'call with friend', 'with mom', 'with dad',
   ],
 };
 
@@ -631,32 +678,55 @@ const CATEGORY_KEYWORDS = {
 function inferCategory(message: string): 'prod' | 'nonprod' | 'admin' | null {
   const lowerMessage = message.toLowerCase();
   
-  // Check for specific phrases first (longer/more specific patterns take priority)
-  // This ensures "call with mom" is detected before generic "call"
-  const specificChecks: Array<{ keywords: string[]; category: 'prod' | 'nonprod' | 'admin' }> = [
-    { keywords: ['call with mom', 'call with dad', 'call with friend', 'with mom', 'with dad'], category: 'nonprod' },
-    { keywords: ['client call', 'work call', 'standup', '1:1'], category: 'prod' },
-    { keywords: ['reading a novel', 'reading novel'], category: 'nonprod' },
+  // FIRST: Check for nonprod sentiment words (these override everything else)
+  // nonprod is ONLY when user explicitly expresses regret/negativity
+  // Use word boundary check to avoid false positives (e.g., "ugh" in "playthrough")
+  const nonprodSentimentPatterns = [
+    /\bwasted\b/, /\bwaste of time\b/, /\bdamn\b/, /\bugh\b/, /\bregret\b/,
+    /\bshouldn't have\b/, /\btoo much\b/, /\btoo long\b/, /\bunproductive\b/, 
+    /\bunfortunately\b/,
   ];
   
-  for (const { keywords, category } of specificChecks) {
-    for (const keyword of keywords) {
-      if (lowerMessage.includes(keyword)) {
-        return category;
-      }
+  for (const pattern of nonprodSentimentPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return 'nonprod';
     }
   }
   
-  // Check each category's keywords (sorted by length descending for better matching)
-  const sortedCategories: Array<[string, string[]]> = Object.entries(CATEGORY_KEYWORDS).map(
-    ([cat, kws]) => [cat, [...kws].sort((a, b) => b.length - a.length)]
-  );
+  // Check for specific admin phrases first (leisure activities that might conflict)
+  const adminPhrases = ['reading a novel', 'reading novel'];
+  for (const phrase of adminPhrases) {
+    if (lowerMessage.includes(phrase)) {
+      return 'admin';
+    }
+  }
   
-  for (const [category, keywords] of sortedCategories) {
-    for (const keyword of keywords) {
-      if (lowerMessage.includes(keyword.toLowerCase())) {
-        return category as 'prod' | 'nonprod' | 'admin';
-      }
+  // Check for specific work phrases (take priority)
+  const prodPhrases = ['client call', 'work call', 'standup', '1:1', 'reading documentation'];
+  for (const phrase of prodPhrases) {
+    if (lowerMessage.includes(phrase)) {
+      return 'prod';
+    }
+  }
+  
+  // Build a combined list of all keywords with their categories
+  // Sort by length (longest first) to match more specific phrases first
+  const allKeywords: Array<{ keyword: string; category: 'prod' | 'admin' }> = [];
+  
+  for (const keyword of CATEGORY_KEYWORDS.prod) {
+    allKeywords.push({ keyword, category: 'prod' });
+  }
+  for (const keyword of CATEGORY_KEYWORDS.admin) {
+    allKeywords.push({ keyword, category: 'admin' });
+  }
+  
+  // Sort by keyword length (longest first)
+  allKeywords.sort((a, b) => b.keyword.length - a.keyword.length);
+  
+  // Find first matching keyword
+  for (const { keyword, category } of allKeywords) {
+    if (lowerMessage.includes(keyword.toLowerCase())) {
+      return category;
     }
   }
   

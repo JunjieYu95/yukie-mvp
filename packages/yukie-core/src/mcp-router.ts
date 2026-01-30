@@ -372,26 +372,33 @@ export async function selectToolParameters(
   if (hasCategory && tool.name === 'diary.log') {
     categoryInstructions = `
 CATEGORY INFERENCE (IMPORTANT):
-The 'category' parameter is REQUIRED and must be inferred from the activity title:
-- "prod" (Productive): coding, programming, work, meetings, learning, studying, reading (default), projects, exercise, gym, running, meditation, writing, research, tutorials
-- "nonprod" (Non-productive): gaming, watching TV/movies/YouTube/Netflix, social media, browsing, entertainment, leisure, hanging out, playing games, reading novels, personal calls (call with mom/dad/friend), date night
-- "admin" (Admin/Rest): meals (breakfast/lunch/dinner), eating, cooking, sleeping, napping, rest, shower, commute, errands, chores, routine tasks, breaks, appointments, walking the dog
+The 'category' parameter is REQUIRED. Use these definitions:
+
+- "prod" (Productive): Intentional work or self-improvement activities
+  Examples: coding, programming, work, meetings, learning, studying, reading documentation, projects, exercise, gym, running, meditation, writing, research, tutorials, client calls, standup
+
+- "admin" (Admin/Rest): Regular life activities including leisure and entertainment (this is normal rest!)
+  Examples: meals (breakfast/lunch/dinner), eating, cooking, sleeping, napping, rest, shower, commute, errands, chores, breaks, appointments, walking the dog, watching TV/movies/Netflix/YouTube, gaming, playing games, social media, browsing, entertainment, hanging out, reading novels, personal calls (call with mom/dad/friend), date night, lanius run, playing Fallout/Elden Ring
+
+- "nonprod" (Non-productive): ONLY use when user explicitly expresses regret, negativity, or waste
+  Trigger words: "damn", "wasted", "waste of time", "shouldn't have", "regret", "sad", "ugh", "unfortunately", "too much", "unproductive"
+  Examples: "damn, wasted 3 hours on YouTube" → nonprod, "ugh scrolled Twitter for too long" → nonprod
+
+CRITICAL: Regular entertainment (gaming, watching TV, etc.) goes to "admin" unless the user expresses negativity about it!
 
 Examples:
 - "vibe coding" → category: "prod"
-- "watching Netflix" → category: "nonprod"  
+- "watching Netflix" → category: "admin" (regular leisure)
+- "damn, wasted time watching Netflix" → category: "nonprod" (user expressed regret)
 - "lunch" → category: "admin"
-- "reading" → category: "prod" (default to productive learning)
-- "reading a novel" → category: "nonprod" (leisure reading)
-- "reading documentation" → category: "prod" (work/learning)
+- "gaming session" → category: "admin" (regular leisure)
+- "lanius run" → category: "admin" (gaming is normal rest)
+- "ugh, played games for too long" → category: "nonprod" (user expressed negativity)
 - "gym workout" → category: "prod"
-- "taking a shower" → category: "admin"
-- "lanius run" or game runs → category: "nonprod" (gaming)
-- "playing Fallout" or "Elden Ring" → category: "nonprod" (gaming)
-- "call with mom" → category: "nonprod" (personal/social)
-- "client call" or "standup" → category: "prod" (work)
-- "date night" → category: "nonprod" (social)
-- "walking the dog" → category: "admin" (chore)
+- "call with mom" → category: "admin" (regular social)
+- "client call" → category: "prod" (work)
+- "reading a novel" → category: "admin" (leisure reading)
+- "reading documentation" → category: "prod" (work/learning)
 
 If the activity is ambiguous (could fit multiple categories), include "categoryConfidence": "low" in your response.
 Otherwise include "categoryConfidence": "high".
