@@ -289,6 +289,67 @@ export async function selectToolParameters(
   tool: MCPTool,
   model?: string
 ): Promise<SelectedToolCall | null> {
+  // =========================================================================
+  // MOMENTUM: Direct pattern matching for simple phrases (skip LLM)
+  // =========================================================================
+  if (tool.name === 'momentum.record') {
+    const msg = userMessage.toLowerCase().trim();
+    
+    // Success patterns
+    const successPatterns = [
+      /^did it!?$/i, /^i did it!?$/i, /^done!?$/i, /^i'm done!?$/i,
+      /^success!?$/i, /^nailed it!?$/i, /^completed!?$/i,
+      /^yes!?$/i, /^yeah!?$/i, /^yep!?$/i, /^yup!?$/i,
+      /^accomplished!?$/i, /^finished!?$/i, /^made it!?$/i,
+      /^got it done!?$/i, /^check!?$/i, /^checked!?$/i,
+      /^crushed it!?$/i, /^killed it!?$/i, /^boom!?$/i,
+      /^win!?$/i, /^winner!?$/i, /^victory!?$/i,
+      /^✓$/, /^✅$/, /^👍$/,
+    ];
+    
+    // Failure patterns
+    const failurePatterns = [
+      /^screwed it!?$/i, /^i screwed it!?$/i,
+      /^failed!?$/i, /^i failed!?$/i, /^failure!?$/i, /^fail!?$/i,
+      /^no!?$/i, /^nope!?$/i,
+      /^didn't do it!?$/i, /^i didn't do it!?$/i,
+      /^missed it!?$/i, /^i missed it!?$/i,
+      /^skipped!?$/i, /^i skipped!?$/i,
+      /^couldn't!?$/i, /^i couldn't!?$/i, /^couldn't do it!?$/i,
+      /^blew it!?$/i, /^i blew it!?$/i,
+      /^messed up!?$/i, /^i messed up!?$/i,
+      /^oops!?$/i, /^whoops!?$/i, /^not today!?$/i,
+      /^lost!?$/i, /^l!?$/i,
+      /^❌$/, /^👎$/,
+    ];
+    
+    for (const pattern of successPatterns) {
+      if (pattern.test(msg)) {
+        logger.info('Momentum: Direct pattern match for success', { userMessage });
+        return { toolName: 'momentum.record', args: { outcome: 'success' } };
+      }
+    }
+    
+    for (const pattern of failurePatterns) {
+      if (pattern.test(msg)) {
+        logger.info('Momentum: Direct pattern match for failure', { userMessage });
+        return { toolName: 'momentum.record', args: { outcome: 'failure' } };
+      }
+    }
+    
+    // If no direct match, fall through to LLM extraction
+    logger.info('Momentum: No direct pattern match, using LLM', { userMessage });
+  }
+
+  // =========================================================================
+  // MOMENTUM STATS: Direct pattern matching
+  // =========================================================================
+  if (tool.name === 'momentum.stats') {
+    // Stats is simple - just return empty args (server uses defaults)
+    logger.info('Momentum stats: Using default parameters', { userMessage });
+    return { toolName: 'momentum.stats', args: {} };
+  }
+
   const schema = tool.inputSchema;
   const params = schema.properties
     ? Object.entries(schema.properties)
