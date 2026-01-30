@@ -161,10 +161,15 @@ function handleAppInstalled() {
               v-for="model in settingsStore.availableModels"
               :key="model.id"
               class="model-option"
-              :class="{ active: settingsStore.selectedModel === model.id }"
+              :class="{ active: settingsStore.selectedModel === model.id, [model.tier]: true }"
               @click="handleModelChange(model.id)"
             >
-              <div class="model-option-name">{{ model.name }}</div>
+              <div class="model-option-header">
+                <span class="model-option-name">{{ model.name }}</span>
+                <span v-if="model.tier === 'advanced'" class="model-tier-badge advanced">★ Pro</span>
+                <span v-else-if="model.tier === 'balanced'" class="model-tier-badge balanced">Balanced</span>
+                <span v-else class="model-tier-badge fast">Fast</span>
+              </div>
               <div class="model-option-desc">{{ model.description }}</div>
             </button>
           </div>
@@ -560,11 +565,45 @@ function handleAppInstalled() {
   background: rgba(15, 118, 110, 0.12);
 }
 
+.model-option-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
 .model-option-name {
   font-size: 14px;
   color: #0f172a;
   font-weight: 600;
-  margin-bottom: 2px;
+}
+
+.model-tier-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.model-tier-badge.advanced {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+}
+
+.model-tier-badge.balanced {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.model-tier-badge.fast {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.model-option.advanced {
+  border-left: 3px solid #f59e0b;
 }
 
 .model-option-desc {

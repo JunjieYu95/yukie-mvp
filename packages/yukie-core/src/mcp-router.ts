@@ -312,18 +312,25 @@ export async function selectToolParameters(
     categoryInstructions = `
 CATEGORY INFERENCE (IMPORTANT):
 The 'category' parameter is REQUIRED and must be inferred from the activity title:
-- "prod" (Productive): coding, programming, work, meetings, learning, studying, reading educational content, projects, exercise, writing, research
-- "nonprod" (Non-productive): gaming, watching TV/movies/YouTube, social media, browsing, entertainment, leisure activities, hanging out
-- "admin" (Admin/Rest): meals, eating, cooking, sleeping, napping, rest, shower, commute, errands, chores, routine tasks, breaks
+- "prod" (Productive): coding, programming, work, meetings, learning, studying, reading (default), projects, exercise, gym, running, meditation, writing, research, tutorials
+- "nonprod" (Non-productive): gaming, watching TV/movies/YouTube/Netflix, social media, browsing, entertainment, leisure, hanging out, playing games, reading novels, personal calls (call with mom/dad/friend), date night
+- "admin" (Admin/Rest): meals (breakfast/lunch/dinner), eating, cooking, sleeping, napping, rest, shower, commute, errands, chores, routine tasks, breaks, appointments, walking the dog
 
 Examples:
 - "vibe coding" → category: "prod"
 - "watching Netflix" → category: "nonprod"  
 - "lunch" → category: "admin"
+- "reading" → category: "prod" (default to productive learning)
 - "reading a novel" → category: "nonprod" (leisure reading)
 - "reading documentation" → category: "prod" (work/learning)
 - "gym workout" → category: "prod"
 - "taking a shower" → category: "admin"
+- "lanius run" or game runs → category: "nonprod" (gaming)
+- "playing Fallout" or "Elden Ring" → category: "nonprod" (gaming)
+- "call with mom" → category: "nonprod" (personal/social)
+- "client call" or "standup" → category: "prod" (work)
+- "date night" → category: "nonprod" (social)
+- "walking the dog" → category: "admin" (chore)
 
 If the activity is ambiguous (could fit multiple categories), include "categoryConfidence": "low" in your response.
 Otherwise include "categoryConfidence": "high".
@@ -331,7 +338,8 @@ Otherwise include "categoryConfidence": "high".
 `;
   }
 
-  const prompt = `You are a parameter extractor. Given a user message and a tool, extract the parameter values.
+  // Build a clearer prompt with examples
+  const prompt = `You are a parameter extractor. Given a user message and a tool, extract the parameter values as JSON.
 
 Tool: ${tool.name}
 Description: ${tool.description}
@@ -341,6 +349,7 @@ ${params}
 User message: "${userMessage}"
 ${categoryInstructions}
 Rules:
+- Extract the activity/task name as the "title" parameter
 - Only include date/month parameters if the user explicitly specifies an absolute date or month (e.g., YYYY-MM-DD or YYYY-MM).
 - If the user says "today", "yesterday", "this week", or "this month", omit date/month parameters and let the server resolve them.
 - Use reasonable defaults for optional parameters.
@@ -349,44 +358,75 @@ Rules:
 - For time parameters, extract exact times if specified (e.g., "from 2pm to 3pm" → startTime: "2pm", endTime: "3pm").
 - If time is not specified, omit time parameters to let the server use smart defaults.
 
-Respond ONLY with valid JSON:
-{
-  "args": { <parameter-values> },
-  "categoryConfidence": "high" or "low" (only for diary.log)
-}`;
+IMPORTANT: Output ONLY valid JSON with no additional text or explanation.
 
-  try {
-    const { result, error } = await completeWithJSON<{ 
-      args: Record<string, unknown>;
-      categoryConfidence?: 'high' | 'low';
-    }>(
-      [{ role: 'user', content: prompt }],
-      {
-        temperature: 0.1,
-        maxTokens: 256,
-        model,
+${tool.name === 'diary.log' ? `Example output for "Log coding from 3pm to 5pm":
+{"args":{"title":"coding","category":"prod","startTime":"3pm","endTime":"5pm"},"categoryConfidence":"high"}
+
+` : ''}Respond with JSON:`;
+
+  // Try up to 2 times
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const { result, error, raw } = await completeWithJSON<{ 
+        args: Record<string, unknown>;
+        categoryConfidence?: 'high' | 'low';
+      }>(
+        [{ role: 'user', content: prompt }],
+        {
+          temperature: attempt === 1 ? 0.1 : 0.0, // Lower temperature on retry
+          maxTokens: 256,
+          model,
+        }
+      );
+
+      if (!result || error) {
+        logger.warn('Failed to extract parameters', { 
+          error, 
+          attempt, 
+          toolName: tool.name,
+          rawResponse: raw?.substring(0, 200),
+        });
+        
+        if (attempt < 2) {
+          continue; // Retry
+        }
+        return null;
       }
-    );
 
-    if (!result || error) {
-      logger.warn('Failed to extract parameters', { error });
+      // Validate that we have required fields
+      if (tool.name === 'diary.log') {
+        if (!result.args?.title) {
+          logger.warn('Missing required title parameter', { args: result.args, attempt });
+          if (attempt < 2) continue;
+          return null;
+        }
+      }
+
+      // If category confidence is low, add it to args so the MCP service can handle follow-up
+      const args = { ...result.args };
+      if (result.categoryConfidence === 'low' && tool.name === 'diary.log') {
+        args._categoryConfidence = 'low';
+      }
+
+      logger.info('Parameter extraction successful', { 
+        toolName: tool.name, 
+        args,
+        attempt,
+      });
+
+      return {
+        toolName: tool.name,
+        args,
+      };
+    } catch (error) {
+      logger.error('Parameter extraction error', error, { attempt, toolName: tool.name });
+      if (attempt < 2) continue;
       return null;
     }
-
-    // If category confidence is low, add it to args so the MCP service can handle follow-up
-    const args = { ...result.args };
-    if (result.categoryConfidence === 'low' && tool.name === 'diary.log') {
-      args._categoryConfidence = 'low';
-    }
-
-    return {
-      toolName: tool.name,
-      args,
-    };
-  } catch (error) {
-    logger.error('Parameter extraction error', error);
-    return null;
   }
+
+  return null;
 }
 
 // ============================================================================
@@ -442,7 +482,21 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
   const toolCall = await selectToolParameters(message, tool, model);
 
   if (!toolCall) {
-    const response = await generateFallbackResponse(message, model);
+    // Parameter extraction failed - provide a helpful message instead of generic fallback
+    logger.warn('Parameter extraction failed, providing helpful error', { 
+      toolName: tool.name, 
+      serviceId, 
+      message: message.substring(0, 100),
+    });
+    
+    // Generate a helpful error message specific to the tool
+    let response: string;
+    if (tool.name === 'diary.log') {
+      response = `I understood you want to log an activity, but I had trouble parsing the details. Could you try rephrasing? For example:\n\n"Log [activity name] from [start time] to [end time]"\n\nLike: "Log coding from 2pm to 4pm" or "Log lunch from 12pm to 1pm"`;
+    } else {
+      response = `I understood your request should go to ${serviceName}, but I had trouble parsing the details. Could you try rephrasing your request more clearly?`;
+    }
+    
     return {
       response,
       serviceUsed: serviceId,
@@ -451,7 +505,7 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
         tool: tool.name,
         service: serviceId,
         confidence: routing.confidence,
-        reasoning: routing.reasoning,
+        reasoning: `Parameter extraction failed: ${routing.reasoning}`,
       },
     };
   }

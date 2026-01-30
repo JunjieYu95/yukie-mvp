@@ -20,7 +20,9 @@
     "generate-token": "npx tsx scripts/generate-token.ts",
     "test-api": "npx tsx scripts/test-anthropic-api.ts",
     "seed-habits": "npx tsx scripts/seed-habit-data.ts",
-    "test-all": "npx tsx scripts/test-all-apis.ts"
+    "test-all": "npx tsx scripts/test-all-apis.ts",
+    "test:mcp": "npx tsx packages/yukie-core/src/__tests__/mcp-routing.test.ts",
+    "test:mcp:dry": "npx tsx packages/yukie-core/src/__tests__/mcp-routing-dry.test.ts"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

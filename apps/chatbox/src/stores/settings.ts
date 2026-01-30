@@ -6,35 +6,57 @@ export interface ModelOption {
   name: string;
   description: string;
   family: 'haiku' | 'sonnet' | 'opus';
+  tier: 'fast' | 'balanced' | 'advanced';
 }
 
 export const AVAILABLE_MODELS: ModelOption[] = [
+  // Advanced tier - Most capable
+  {
+    id: 'claude-opus-4-5-20251101',
+    name: 'Claude Opus 4.5',
+    description: 'Most capable, best for complex tasks',
+    family: 'opus',
+    tier: 'advanced',
+  },
+  {
+    id: 'claude-sonnet-4-5-20250929',
+    name: 'Claude Sonnet 4.5',
+    description: 'High capability, great balance',
+    family: 'sonnet',
+    tier: 'advanced',
+  },
+  // Balanced tier
+  {
+    id: 'claude-sonnet-4-20250514',
+    name: 'Claude Sonnet 4',
+    description: 'Previous gen flagship',
+    family: 'sonnet',
+    tier: 'balanced',
+  },
+  {
+    id: 'claude-3-7-sonnet-20250219',
+    name: 'Claude Sonnet 3.7',
+    description: 'Extended thinking, reasoning',
+    family: 'sonnet',
+    tier: 'balanced',
+  },
+  // Fast tier
   {
     id: 'claude-3-5-haiku-20241022',
     name: 'Claude Haiku 3.5',
     description: 'Fast and efficient',
     family: 'haiku',
-  },
-  {
-    id: 'claude-3-7-sonnet-20250219',
-    name: 'Claude Sonnet 3.7',
-    description: 'Balanced performance',
-    family: 'sonnet',
-  },
-  {
-    id: 'claude-3-5-sonnet-20241022',
-    name: 'Claude Sonnet 3.5',
-    description: 'Previous generation',
-    family: 'sonnet',
+    tier: 'fast',
   },
 ];
 
 const MODEL_KEY = 'yukie_selected_model';
+const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'; // Sonnet 4.5 as default (good balance)
 
 export const useSettingsStore = defineStore('settings', () => {
   const selectedModel = ref<string>(
     // Load from localStorage or use default
-    localStorage.getItem(MODEL_KEY) || AVAILABLE_MODELS[0].id
+    localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
   );
 
   function setModel(modelId: string) {
