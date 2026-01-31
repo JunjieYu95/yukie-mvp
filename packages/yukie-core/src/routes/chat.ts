@@ -85,12 +85,13 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
 
     const timing = timer();
 
-    // Build response
-    const response: ChatResponse = {
+    // Build response (include actionInvoked for frontend compatibility)
+    const response: ChatResponse & { actionInvoked?: string } = {
       response: result.response,
       conversationId: body.conversationId || generateConversationId(),
       serviceUsed: result.serviceUsed,
       toolInvoked: result.toolInvoked,
+      actionInvoked: result.toolInvoked,
       routingDetails: result.routingDetails ? {
         targetService: result.routingDetails.service || 'unknown',
         confidence: result.routingDetails.confidence,
