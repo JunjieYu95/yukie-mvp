@@ -214,6 +214,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         serviceUsed: result.serviceUsed,
         actionInvoked: result.toolInvoked,
         routingDetails,
+        // Include rich content (images, etc.) if present
+        content: result.content,
       });
     } else {
       // Fallback to direct LLM call (routing disabled)
