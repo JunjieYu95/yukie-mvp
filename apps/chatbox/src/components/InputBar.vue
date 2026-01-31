@@ -131,7 +131,7 @@ onMounted(() => {
       <div class="tool-row">
         <button
           v-if="isYukieChat"
-          class="tool-button"
+          class="tool-button essential"
           :class="{ active: showRoutingControls }"
           :disabled="disabled"
           title="Routing controls"
@@ -140,7 +140,7 @@ onMounted(() => {
           🎯
         </button>
         <button
-          class="tool-button"
+          class="tool-button essential"
           :class="{ active: isVoiceMode }"
           :disabled="disabled"
           :title="isVoiceMode ? 'Switch to typing' : 'Use voice input'"
@@ -239,6 +239,32 @@ onMounted(() => {
 @media (max-width: 400px) {
   .tool-row .tool-button:not(.essential) {
     display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .input-bar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .tool-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .voice-hold-container {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .tool-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 8px;
+    font-size: 13px;
   }
 }
 
