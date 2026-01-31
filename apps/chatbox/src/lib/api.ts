@@ -4,6 +4,13 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+export interface ChatResponseContent {
+  type: 'text' | 'image';
+  text?: string;
+  data?: string;  // base64 encoded image data
+  mimeType?: string;
+}
+
 export interface ChatResponse {
   response: string;
   conversationId: string;
@@ -16,6 +23,8 @@ export interface ChatResponse {
     confidence: number;
     reasoning: string;
   };
+  // Rich content support (images, etc.)
+  content?: ChatResponseContent[];
 }
 
 export interface InboxJob {

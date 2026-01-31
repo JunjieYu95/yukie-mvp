@@ -96,6 +96,8 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
         confidence: result.routingDetails.confidence,
         reasoning: result.routingDetails.reasoning,
       } : undefined,
+      // Include rich content (images, etc.) if present
+      content: result.content,
     };
 
     logger.info('Chat message processed', {

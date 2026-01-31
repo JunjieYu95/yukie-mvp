@@ -5,6 +5,13 @@ import { useSettingsStore } from './settings';
 import { useContactsStore } from './contacts';
 import { sendChatMessage } from '../lib/api';
 
+export interface MessageContent {
+  type: 'text' | 'image';
+  text?: string;
+  data?: string;  // base64 encoded image data
+  mimeType?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -13,6 +20,8 @@ export interface Message {
   status: 'sending' | 'sent' | 'error';
   serviceUsed?: string;
   actionInvoked?: string;
+  // Rich content (images, etc.)
+  richContent?: MessageContent[];
 }
 
 export interface Conversation {
@@ -191,6 +200,7 @@ export const useChatStore = defineStore('chat', () => {
           content: response.response,
           serviceUsed: response.serviceUsed,
           actionInvoked: response.actionInvoked,
+          richContent: response.content,
         },
         queueItem.contactId
       );

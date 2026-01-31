@@ -28,6 +28,22 @@ const actionDisplayName = computed(() => {
   // Convert action name to display name
   return props.message.actionInvoked.replace('habit.', '').replace(/\./g, ' ');
 });
+
+// Check if message has image content
+const hasImages = computed(() => {
+  return props.message.richContent?.some(c => c.type === 'image' && c.data);
+});
+
+const imageContents = computed(() => {
+  if (!props.message.richContent) return [];
+  return props.message.richContent.filter(c => c.type === 'image' && c.data);
+});
+
+// Generate data URL for image
+function getImageDataUrl(content: { data?: string; mimeType?: string }): string {
+  const mimeType = content.mimeType || 'image/png';
+  return `data:${mimeType};base64,${content.data}`;
+}
 </script>
 
 <template>
@@ -39,10 +55,27 @@ const actionDisplayName = computed(() => {
       'system-message': isSystem,
       'error': message.status === 'error',
       'sending': message.status === 'sending',
+      'has-image': hasImages,
     }"
   >
     <div class="message-content">
       {{ message.content }}
+    </div>
+
+    <!-- Render image content -->
+    <div v-if="hasImages" class="message-images">
+      <div
+        v-for="(img, index) in imageContents"
+        :key="index"
+        class="message-image-container"
+      >
+        <img
+          :src="getImageDataUrl(img)"
+          :alt="`Chart ${index + 1}`"
+          class="message-image"
+          loading="lazy"
+        />
+      </div>
     </div>
 
     <div class="message-meta">
@@ -190,6 +223,65 @@ const actionDisplayName = computed(() => {
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Image content styles */
+.message-bubble.has-image {
+  max-width: 95%;
+}
+
+@media (min-width: 600px) {
+  .message-bubble.has-image {
+    max-width: 90%;
+  }
+}
+
+@media (min-width: 981px) {
+  .message-bubble.has-image {
+    max-width: 85%;
+  }
+}
+
+.message-images {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-image-container {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.message-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+@media (min-width: 600px) {
+  .message-image {
+    max-height: 500px;
+  }
+}
+
+@media (min-width: 981px) {
+  .message-image {
+    max-height: 600px;
+  }
+}
+
+.user-message .message-image-container {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-message .message-image {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .message-meta {

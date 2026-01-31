@@ -440,7 +440,7 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
       {
         id: 'diary-analyzer',
         name: 'Diary Analyzer',
-        description: 'Log activities to Google Calendar with time duration. Use for "log activity", "spent time on", "worked on", "did X for Y minutes/hours". Creates calendar events.',
+        description: 'Log activities to Google Calendar with time duration and view time statistics. Use for "log activity", "spent time on", "worked on", "did X for Y minutes/hours", "how did I spend my time", "time stats", "productivity stats". Creates calendar events and generates charts.',
         baseUrl: process.env.DIARY_ANALYZER_URL || 'https://diary-analyzer-zeta.vercel.app',
         mcpEndpoint:
           process.env.DIARY_ANALYZER_MCP_URL ||
@@ -456,6 +456,12 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
           'milestones',
           'achievements',
           'diary entry',
+          'time statistics',
+          'time stats',
+          'productivity stats',
+          'time distribution',
+          'weekly stats',
+          'category breakdown',
         ],
         scopes: ['diary:read', 'diary:write'],
         healthEndpoint: '/api/mcp',

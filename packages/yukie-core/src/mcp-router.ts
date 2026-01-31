@@ -520,6 +520,13 @@ export interface MCPChatFlowResult {
     confidence: number;
     reasoning: string;
   };
+  // Rich content (images, etc.) from MCP tool responses
+  content?: Array<{
+    type: 'text' | 'image';
+    text?: string;
+    data?: string;
+    mimeType?: string;
+  }>;
 }
 
 export async function processMCPChatMessage(options: MCPChatFlowOptions): Promise<MCPChatFlowResult> {
@@ -598,6 +605,24 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
     response = await formatResponse(message, toolResult, serviceName, model);
   }
 
+  // Extract rich content (images, etc.) from tool result
+  const richContent: Array<{
+    type: 'text' | 'image';
+    text?: string;
+    data?: string;
+    mimeType?: string;
+  }> = [];
+
+  for (const content of toolResult.content) {
+    if (content.type === 'image' && content.data) {
+      richContent.push({
+        type: 'image',
+        data: content.data,
+        mimeType: content.mimeType || 'image/png',
+      });
+    }
+  }
+
   return {
     response,
     serviceUsed: serviceId,
@@ -609,5 +634,6 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
       confidence: routing.confidence,
       reasoning: routing.reasoning,
     },
+    content: richContent.length > 0 ? richContent : undefined,
   };
 }

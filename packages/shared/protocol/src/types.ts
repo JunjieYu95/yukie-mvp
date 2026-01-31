@@ -23,6 +23,13 @@ export interface ChatRequest {
   targetService?: string; // Optional: bypass LLM routing and send directly to this service
 }
 
+export interface ChatResponseContent {
+  type: 'text' | 'image';
+  text?: string;
+  data?: string;  // base64 encoded image data
+  mimeType?: string;
+}
+
 export interface ChatResponse {
   response: string;
   conversationId: string;
@@ -34,6 +41,8 @@ export interface ChatResponse {
     confidence: number;
     reasoning: string;
   };
+  // Rich content support (images, etc.)
+  content?: ChatResponseContent[];
 }
 
 export interface InboxJob {
