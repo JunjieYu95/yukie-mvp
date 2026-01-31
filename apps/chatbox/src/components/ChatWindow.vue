@@ -144,7 +144,7 @@ function handleClear() {
     </div>
 
     <InputBar
-      :disabled="chatStore.isLoading"
+      :disabled="!chatStore.canSend"
       @send="handleSend"
     />
   </div>

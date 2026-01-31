@@ -7,7 +7,7 @@ import { useAuthStore } from '../stores/auth';
 // Props & Emits
 // ============================================================================
 
-defineProps<{
+const props = defineProps<{
   disabled?: boolean;
 }>();
 
@@ -27,6 +27,8 @@ type RecordingState = 'idle' | 'requesting' | 'recording' | 'processing';
 const state = ref<RecordingState>('idle');
 const recordingDuration = ref(0);
 const errorMessage = ref<string | null>(null);
+const isPressing = ref(false);
+const stopAfterStart = ref(false);
 
 // MediaRecorder instances
 let mediaRecorder: MediaRecorder | null = null;
@@ -133,6 +135,11 @@ async function startRecording() {
     durationInterval = setInterval(() => {
       recordingDuration.value++;
     }, 1000);
+
+    if (stopAfterStart.value) {
+      stopAfterStart.value = false;
+      stopRecording();
+    }
   } catch (error) {
     console.error('Failed to start recording:', error);
 
@@ -219,6 +226,8 @@ function handleError(message: string) {
   cleanup();
   state.value = 'idle';
   recordingDuration.value = 0;
+  isPressing.value = false;
+  stopAfterStart.value = false;
 }
 
 function cleanup() {
@@ -250,12 +259,55 @@ function dismissError() {
   errorMessage.value = null;
 }
 
-function handleButtonClick() {
-  if (state.value === 'idle') {
-    startRecording();
-  } else if (state.value === 'recording') {
-    stopRecording();
+function handlePressStart(event: PointerEvent) {
+  if (props.disabled || isProcessing.value) return;
+  if (event.button !== 0) return;
+  const target = event.currentTarget as HTMLElement | null;
+  if (target && event.pointerId !== undefined) {
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // Ignore if capture is not supported
+    }
   }
+  isPressing.value = true;
+  stopAfterStart.value = false;
+  startRecording();
+}
+
+function handlePressEnd(event?: PointerEvent) {
+  if (!isPressing.value) return;
+  if (event?.currentTarget && event.pointerId !== undefined) {
+    const target = event.currentTarget as HTMLElement;
+    try {
+      target.releasePointerCapture(event.pointerId);
+    } catch {
+      // Ignore if release is not supported
+    }
+  }
+  isPressing.value = false;
+
+  if (state.value === 'recording') {
+    stopRecording();
+  } else if (state.value === 'requesting') {
+    stopAfterStart.value = true;
+  }
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.repeat) return;
+  if (event.key !== ' ' && event.key !== 'Enter') return;
+  event.preventDefault();
+  if (props.disabled || isProcessing.value) return;
+  isPressing.value = true;
+  stopAfterStart.value = false;
+  startRecording();
+}
+
+function handleKeyup(event: KeyboardEvent) {
+  if (event.key !== ' ' && event.key !== 'Enter') return;
+  event.preventDefault();
+  handlePressEnd();
 }
 
 // ============================================================================
@@ -290,15 +342,22 @@ defineExpose({
         processing: isProcessing,
         requesting: isRequesting,
       }"
-      :disabled="disabled || isProcessing"
+      :disabled="props.disabled || isProcessing"
       :title="
         isRecording
-          ? 'Click to stop recording'
+          ? 'Release to stop recording'
           : isProcessing
             ? 'Transcribing...'
-            : 'Click to start voice recording'
+            : 'Hold to talk'
       "
-      @click="handleButtonClick"
+      aria-label="Hold to talk"
+      :aria-pressed="isRecording"
+      :aria-busy="isProcessing"
+      @pointerdown.prevent="handlePressStart"
+      @pointerup="handlePressEnd"
+      @pointercancel="handlePressEnd"
+      @keydown="handleKeydown"
+      @keyup="handleKeyup"
     >
       <!-- Microphone icon (idle state) -->
       <svg
@@ -385,9 +444,9 @@ defineExpose({
 }
 
 .voice-button {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: rgba(15, 23, 42, 0.04);
@@ -402,10 +461,10 @@ defineExpose({
 
 @media (min-width: 600px) {
   .voice-button {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    border-radius: 12px;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    border-radius: 14px;
   }
 }
 

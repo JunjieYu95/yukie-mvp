@@ -41,6 +41,21 @@ export const useChatStore = defineStore('chat', () => {
   // Target service for manual routing control
   const targetService = ref<string | null>(null);
 
+  const messageQueue = ref<
+    Array<{
+      content: string;
+      contactId: string;
+      targetService: string | null;
+      userMessageId: string;
+      createdAt: Date;
+    }>
+  >([]);
+  const isProcessingQueue = ref(false);
+
+  const canSend = computed(() => {
+    return authStore.isAuthenticated && !!contactsStore.activeContact;
+  });
+
   const activeConversation = computed(() => {
     if (!activeConversationId.value) return null;
     return conversations.value.get(activeConversationId.value) || null;
@@ -107,59 +122,33 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function updateMessage(messageId: string, updates: Partial<Message>) {
-    const conversation = activeConversation.value;
-    if (!conversation) return;
-
-    const message = conversation.messages.find((m) => m.id === messageId);
-    if (message) {
-      Object.assign(message, updates);
+    for (const conversation of conversations.value.values()) {
+      const message = conversation.messages.find((m) => m.id === messageId);
+      if (message) {
+        Object.assign(message, updates);
+        return;
+      }
     }
   }
 
-  async function sendMessage(content: string) {
-    if (!authStore.isAuthenticated) {
-      error.value = 'Not authenticated';
-      return;
-    }
-
-    if (!content.trim()) return;
-
-    const activeContact = contactsStore.activeContact;
-    if (!activeContact) {
-      error.value = 'No contact selected';
-      return;
-    }
-
-    // Determine target service: use manual selection, or use contact ID for direct service chat
-    let effectiveTargetService = targetService.value;
-    if (!effectiveTargetService && activeContact.type === 'service') {
-      effectiveTargetService = activeContact.id;
-    }
-
-    error.value = null;
-    isLoading.value = true;
-    processingStatus.value = effectiveTargetService
-      ? { stage: 'fetching-actions', service: effectiveTargetService }
+  async function processQueuedMessage(queueItem: {
+    content: string;
+    contactId: string;
+    targetService: string | null;
+    userMessageId: string;
+    createdAt: Date;
+  }) {
+    processingStatus.value = queueItem.targetService
+      ? { stage: 'fetching-actions', service: queueItem.targetService }
       : { stage: 'routing' };
 
-    // Add user message
-    const userMessage = addMessage(
-      {
-        role: 'user',
-        content: content.trim(),
-      },
-      activeContact.id
-    );
-
-    // Simulate progress updates
     const progressInterval = setInterval(() => {
       if (!isLoading.value) {
         clearInterval(progressInterval);
         return;
       }
-      
-      // Update status based on elapsed time
-      const elapsed = Date.now() - userMessage.timestamp.getTime();
+
+      const elapsed = Date.now() - queueItem.createdAt.getTime();
       if (elapsed > 2000 && processingStatus.value?.stage === 'routing') {
         processingStatus.value = { stage: 'fetching-actions', service: 'service' };
       } else if (elapsed > 3000 && processingStatus.value?.stage === 'fetching-actions') {
@@ -168,21 +157,19 @@ export const useChatStore = defineStore('chat', () => {
     }, 500);
 
     try {
-      const conversationId = ensureConversation(activeContact.id);
+      const conversationId = ensureConversation(queueItem.contactId);
 
       const response = await sendChatMessage(
-        content.trim(),
+        queueItem.content,
         conversationId,
         authStore.token!,
         settingsStore.selectedModel,
-        effectiveTargetService || undefined
+        queueItem.targetService || undefined
       );
 
       clearInterval(progressInterval);
 
-      // Update status with actual service info
       if (response.serviceUsed) {
-        // Map service IDs to friendly names
         const serviceNameMap: Record<string, string> = {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
@@ -196,10 +183,8 @@ export const useChatStore = defineStore('chat', () => {
         };
       }
 
-      // Update user message status
-      updateMessage(userMessage.id, { status: 'sent' });
+      updateMessage(queueItem.userMessageId, { status: 'sent' });
 
-      // Add assistant response
       addMessage(
         {
           role: 'assistant',
@@ -207,52 +192,108 @@ export const useChatStore = defineStore('chat', () => {
           serviceUsed: response.serviceUsed,
           actionInvoked: response.actionInvoked,
         },
-        activeContact.id
+        queueItem.contactId
       );
 
-      // Show routing details if available
       if (response.routingDetails && response.routingDetails.targetService !== 'none') {
-        // Map service IDs to friendly names
         const serviceNameMap: Record<string, string> = {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
           'workstyle': 'Workstyle',
         };
-        const serviceName = serviceNameMap[response.routingDetails.targetService] || response.routingDetails.targetService;
+        const serviceName =
+          serviceNameMap[response.routingDetails.targetService] ||
+          response.routingDetails.targetService;
         const toolName = response.routingDetails.tool || response.actionInvoked;
-        
+
         addMessage(
           {
             role: 'system',
             content: `✓ Routed to ${serviceName} (${Math.round(response.routingDetails.confidence * 100)}% confidence)${toolName && toolName !== 'none' ? ` → ${toolName}` : ''}`,
           },
-          activeContact.id
+          queueItem.contactId
         );
       }
 
-      // Update conversation ID if server returned a different one
       if (response.conversationId !== conversationId) {
-        activeConversationId.value = response.conversationId;
-        conversationByContactId.value.set(activeContact.id, response.conversationId);
+        if (contactsStore.activeContactId === queueItem.contactId) {
+          activeConversationId.value = response.conversationId;
+        }
+        conversationByContactId.value.set(queueItem.contactId, response.conversationId);
       }
     } catch (err) {
-      clearInterval(progressInterval);
-      updateMessage(userMessage.id, { status: 'error' });
+      updateMessage(queueItem.userMessageId, { status: 'error' });
       error.value = err instanceof Error ? err.message : 'Failed to send message';
 
-      // Add error message
       addMessage(
         {
           role: 'system',
           content: 'Sorry, I had trouble processing your message. Please try again.',
         },
-        activeContact.id
+        queueItem.contactId
       );
     } finally {
-      isLoading.value = false;
-      processingStatus.value = null;
+      clearInterval(progressInterval);
     }
+  }
+
+  async function processQueue() {
+    if (isProcessingQueue.value) return;
+
+    isProcessingQueue.value = true;
+    isLoading.value = true;
+
+    while (messageQueue.value.length > 0) {
+      const nextItem = messageQueue.value[0];
+      await processQueuedMessage(nextItem);
+      messageQueue.value.shift();
+    }
+
+    isLoading.value = false;
+    processingStatus.value = null;
+    isProcessingQueue.value = false;
+  }
+
+  async function sendMessage(content: string) {
+    if (!authStore.isAuthenticated) {
+      error.value = 'Not authenticated';
+      return;
+    }
+
+    const trimmedContent = content.trim();
+    if (!trimmedContent) return;
+
+    const activeContact = contactsStore.activeContact;
+    if (!activeContact) {
+      error.value = 'No contact selected';
+      return;
+    }
+
+    let effectiveTargetService = targetService.value;
+    if (!effectiveTargetService && activeContact.type === 'service') {
+      effectiveTargetService = activeContact.id;
+    }
+
+    error.value = null;
+
+    const userMessage = addMessage(
+      {
+        role: 'user',
+        content: trimmedContent,
+      },
+      activeContact.id
+    );
+
+    messageQueue.value.push({
+      content: trimmedContent,
+      contactId: activeContact.id,
+      targetService: effectiveTargetService,
+      userMessageId: userMessage.id,
+      createdAt: userMessage.timestamp,
+    });
+
+    processQueue();
   }
 
   function clearConversation() {
@@ -289,6 +330,7 @@ export const useChatStore = defineStore('chat', () => {
     error,
     processingStatus,
     targetService,
+    canSend,
     createConversation,
     addMessage,
     sendMessage,
