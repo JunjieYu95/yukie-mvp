@@ -205,6 +205,186 @@ export async function invokeTool(options: InvokeToolOptions): Promise<MCPToolsCa
   return registry.invokeTool(serviceId, toolName, args, context);
 }
 
+function extractDailyBreakdown(
+  structuredContent: unknown
+): Array<{ date: string; prod: number; admin: number; nonprod: number; total: number }> | null {
+  if (!structuredContent || typeof structuredContent !== 'object') return null;
+  const stats = (structuredContent as { stats?: { dailyBreakdown?: Record<string, unknown> } }).stats;
+  if (!stats || !stats.dailyBreakdown) return null;
+
+  const entries = Object.entries(stats.dailyBreakdown);
+  const parsed = entries
+    .map(([date, value]) => {
+      if (!value || typeof value !== 'object') return null;
+      const record = value as { prod?: number; admin?: number; nonprod?: number; total?: number };
+      if (typeof record.total !== 'number') return null;
+      return {
+        date,
+        prod: typeof record.prod === 'number' ? record.prod : 0,
+        admin: typeof record.admin === 'number' ? record.admin : 0,
+        nonprod: typeof record.nonprod === 'number' ? record.nonprod : 0,
+        total: record.total,
+      };
+    })
+    .filter(
+      (item): item is { date: string; prod: number; admin: number; nonprod: number; total: number } => !!item
+    );
+
+  if (parsed.length === 0) return null;
+  parsed.sort((a, b) => a.date.localeCompare(b.date));
+  return parsed;
+}
+
+function getWeekStart(date: Date): Date {
+  const day = date.getDay();
+  const daysSinceMonday = (day + 6) % 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() - daysSinceMonday);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function getDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function pickGranularity(
+  intent: SelectedToolCall['intentAnalysis'],
+  firstDate: Date,
+  lastDate: Date
+): 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' {
+  if (intent?.granularity) return intent.granularity;
+  const rangeDays = Math.max(1, Math.round((lastDate.getTime() - firstDate.getTime()) / 86400000) + 1);
+  if (rangeDays > 365) return 'monthly';
+  if (rangeDays > 120) return 'monthly';
+  if (rangeDays > 45) return 'weekly';
+  return 'daily';
+}
+
+function aggregateDailyBreakdown(
+  daily: Array<{ date: string; prod: number; admin: number; nonprod: number; total: number }>,
+  granularity: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+): { labels: string[]; prod: number[]; admin: number[]; nonprod: number[] } {
+  const buckets = new Map<
+    string,
+    { prod: number; admin: number; nonprod: number }
+  >();
+
+  for (const entry of daily) {
+    const date = new Date(`${entry.date}T00:00:00`);
+    let key = entry.date;
+
+    if (granularity === 'weekly') {
+      key = getDateKey(getWeekStart(date));
+    } else if (granularity === 'monthly') {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    } else if (granularity === 'quarterly') {
+      const quarter = Math.floor(date.getMonth() / 3) + 1;
+      key = `${date.getFullYear()}-Q${quarter}`;
+    } else if (granularity === 'yearly') {
+      key = String(date.getFullYear());
+    }
+
+    if (!buckets.has(key)) {
+      buckets.set(key, { prod: 0, admin: 0, nonprod: 0 });
+    }
+
+    const bucket = buckets.get(key)!;
+    bucket.prod += entry.prod;
+    bucket.admin += entry.admin;
+    bucket.nonprod += entry.nonprod;
+  }
+
+  const labels = Array.from(buckets.keys()).sort();
+  const prod = labels.map((label) => Number(((buckets.get(label)?.prod || 0) / 60).toFixed(2))).map(Number);
+  const admin = labels.map((label) => Number(((buckets.get(label)?.admin || 0) / 60).toFixed(2))).map(Number);
+  const nonprod = labels.map((label) => Number(((buckets.get(label)?.nonprod || 0) / 60).toFixed(2))).map(Number);
+  return { labels, prod, admin, nonprod };
+}
+
+async function generateTrendChartImage(
+  daily: Array<{ date: string; prod: number; admin: number; nonprod: number; total: number }>,
+  intent: SelectedToolCall['intentAnalysis']
+): Promise<{ data: string; mimeType: string } | null> {
+  if (daily.length === 0) return null;
+  const firstDate = new Date(`${daily[0].date}T00:00:00`);
+  const lastDate = new Date(`${daily[daily.length - 1].date}T00:00:00`);
+  const granularity = pickGranularity(intent, firstDate, lastDate);
+  const { labels, prod, admin, nonprod } = aggregateDailyBreakdown(daily, granularity);
+
+  if (labels.length === 0) return null;
+
+  const chartConfig = {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Productive',
+          data: prod,
+          borderColor: '#0f766e',
+          backgroundColor: 'rgba(15, 118, 110, 0.15)',
+          fill: false,
+          tension: 0.25,
+        },
+        {
+          label: 'Admin/Rest',
+          data: admin,
+          borderColor: '#f97316',
+          backgroundColor: 'rgba(249, 115, 22, 0.15)',
+          fill: false,
+          tension: 0.25,
+        },
+        {
+          label: 'Non-productive',
+          data: nonprod,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          fill: false,
+          tension: 0.25,
+        },
+      ],
+    },
+    options: {
+      plugins: {
+        legend: { display: true },
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Hours' },
+        },
+      },
+    },
+  };
+
+  try {
+    const response = await fetch('https://quickchart.io/chart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chart: chartConfig,
+        width: 1000,
+        height: 600,
+        backgroundColor: 'white',
+      }),
+    });
+
+    if (!response.ok) {
+      logger.warn('QuickChart request failed', { status: response.status });
+      return null;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return { data: buffer.toString('base64'), mimeType: 'image/png' };
+  } catch (error) {
+    logger.warn('Failed to generate trend chart image', {}, error);
+    return null;
+  }
+}
+
 // ============================================================================
 // Response Formatting
 // ============================================================================
@@ -282,6 +462,19 @@ export async function generateFallbackResponse(userMessage: string, model?: stri
 interface SelectedToolCall {
   toolName: string;
   args: Record<string, unknown>;
+  intentAnalysis?: {
+    intent: 'log' | 'query' | 'summary' | 'trend' | 'chart' | 'other';
+    timeRange?: {
+      from?: string;
+      to?: string;
+      month?: string;
+      year?: number;
+      quarter?: string;
+    };
+    granularity?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | null;
+    visualization?: 'line' | 'bar' | 'area' | 'pie' | 'heatmap' | null;
+    output?: 'chart' | 'table' | 'both' | 'text' | null;
+  };
 }
 
 export async function selectToolParameters(
@@ -406,6 +599,166 @@ Otherwise include "categoryConfidence": "high".
 `;
   }
 
+  function formatDateLocal(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  async function analyzeUserIntent(message: string) {
+    const today = formatDateLocal(new Date());
+    const prompt = `You are an intent and time-range analyst for an assistant.
+
+Today is ${today} (use this to resolve relative dates).
+
+Given the user message, extract:
+- intent: one of ["log", "query", "summary", "trend", "chart", "other"]
+- timeRange: { "from"?: "YYYY-MM-DD", "to"?: "YYYY-MM-DD", "month"?: "YYYY-MM", "year"?: number, "quarter"?: "YYYY-QN" }
+- granularity: one of ["daily", "weekly", "monthly", "quarterly", "yearly"] or null
+- visualization: one of ["line", "bar", "area", "pie", "heatmap"] or null
+- output: one of ["chart", "table", "both", "text"] or null
+
+User message: "${message}"
+
+Rules:
+- If the user asks for a trend or visualization, set intent to "trend" or "chart".
+- Resolve relative periods like "last month", "last quarter", "last year" into explicit dates or month/quarter fields.
+- If the user asks for weekly/monthly breakdowns, set granularity accordingly.
+- Output ONLY valid JSON.
+`;
+
+    try {
+      const { result, error } = await completeWithJSON<{
+        intent: 'log' | 'query' | 'summary' | 'trend' | 'chart' | 'other';
+        timeRange?: {
+          from?: string;
+          to?: string;
+          month?: string;
+          year?: number;
+          quarter?: string;
+        };
+        granularity?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | null;
+        visualization?: 'line' | 'bar' | 'area' | 'pie' | 'heatmap' | null;
+        output?: 'chart' | 'table' | 'both' | 'text' | null;
+      }>([{ role: 'user', content: prompt }], {
+        temperature: 0.1,
+        maxTokens: 256,
+        model,
+      });
+
+      if (error || !result) return null;
+      return result;
+    } catch (error) {
+      logger.warn('Intent analysis failed', {}, error);
+      return null;
+    }
+  }
+
+  const intentAnalysis = await analyzeUserIntent(userMessage);
+
+  function getMonthRange(month: string): { from: string; to: string } | null {
+    const match = month.match(/^(\d{4})-(\d{2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const monthIndex = Number(match[2]) - 1;
+    if (Number.isNaN(year) || Number.isNaN(monthIndex)) return null;
+    const start = new Date(year, monthIndex, 1);
+    const end = new Date(year, monthIndex + 1, 0);
+    return { from: formatDateLocal(start), to: formatDateLocal(end) };
+  }
+
+  function getQuarterRange(quarter: string): { from: string; to: string } | null {
+    const match = quarter.match(/^(\d{4})-Q([1-4])$/i);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const quarterIndex = Number(match[2]) - 1;
+    if (Number.isNaN(year) || Number.isNaN(quarterIndex)) return null;
+    const startMonth = quarterIndex * 3;
+    const start = new Date(year, startMonth, 1);
+    const end = new Date(year, startMonth + 3, 0);
+    return { from: formatDateLocal(start), to: formatDateLocal(end) };
+  }
+
+  function applyIntentToArgs(
+    toolName: string,
+    args: Record<string, unknown>,
+    intent: typeof intentAnalysis
+  ): Record<string, unknown> {
+    if (!intent || !intent.timeRange) return args;
+
+    const nextArgs = { ...args };
+    const timeRange = intent.timeRange;
+
+    if (toolName === 'diary.getTimeStats') {
+      if (timeRange.from && timeRange.to) {
+        nextArgs.period = 'custom';
+        nextArgs.from = timeRange.from;
+        nextArgs.to = timeRange.to;
+      } else if (timeRange.month) {
+        const range = getMonthRange(timeRange.month);
+        if (range) {
+          nextArgs.period = 'custom';
+          nextArgs.from = range.from;
+          nextArgs.to = range.to;
+        }
+      } else if (timeRange.year) {
+        const start = new Date(timeRange.year, 0, 1);
+        const end = new Date(timeRange.year, 11, 31);
+        nextArgs.period = 'custom';
+        nextArgs.from = formatDateLocal(start);
+        nextArgs.to = formatDateLocal(end);
+      } else if (timeRange.quarter) {
+        const range = getQuarterRange(timeRange.quarter);
+        if (range) {
+          nextArgs.period = 'custom';
+          nextArgs.from = range.from;
+          nextArgs.to = range.to;
+        }
+      }
+
+      if (intent.visualization && !nextArgs.chartType) {
+        const allowedChartTypes = new Set(['bar', 'pie', 'doughnut']);
+        if (allowedChartTypes.has(intent.visualization)) {
+          nextArgs.chartType = intent.visualization;
+        }
+      }
+      if (intent.output === 'chart') {
+        nextArgs.includeChart = true;
+      }
+    }
+
+    if (toolName === 'diary.queryEvents') {
+      if (timeRange.from && timeRange.to) {
+        nextArgs.from = timeRange.from;
+        nextArgs.to = timeRange.to;
+      } else if (timeRange.month) {
+        const range = getMonthRange(timeRange.month);
+        if (range) {
+          nextArgs.from = range.from;
+          nextArgs.to = range.to;
+        }
+      } else if (timeRange.year) {
+        const start = new Date(timeRange.year, 0, 1);
+        const end = new Date(timeRange.year, 11, 31);
+        nextArgs.from = formatDateLocal(start);
+        nextArgs.to = formatDateLocal(end);
+      } else if (timeRange.quarter) {
+        const range = getQuarterRange(timeRange.quarter);
+        if (range) {
+          nextArgs.from = range.from;
+          nextArgs.to = range.to;
+        }
+      }
+
+      if (intent.output === 'chart') {
+        nextArgs.includeChart = true;
+      }
+    }
+
+    return nextArgs;
+  }
+
   // Build a clearer prompt with examples
   const prompt = `You are a parameter extractor. Given a user message and a tool, extract the parameter values as JSON.
 
@@ -416,10 +769,11 @@ ${params}
 
 User message: "${userMessage}"
 ${categoryInstructions}
+${intentAnalysis ? `Intent analysis (use this to fill parameters when schema supports it):\n${JSON.stringify(intentAnalysis)}\n` : ''}
 Rules:
 - Extract the activity/task name as the "title" parameter
-- Only include date/month parameters if the user explicitly specifies an absolute date or month (e.g., YYYY-MM-DD or YYYY-MM).
-- If the user says "today", "yesterday", "this week", or "this month", omit date/month parameters and let the server resolve them.
+- If the user specifies any time period (absolute or relative), map it to the tool's date/month parameters using ISO formats.
+- Use intent analysis to set date ranges, granularity, and visualization parameters when the schema supports them.
 - Use reasonable defaults for optional parameters.
 - For dates, use ISO format (YYYY-MM-DD).
 - For boolean parameters, infer from context (e.g., "check in" implies checked=true).
@@ -477,15 +831,18 @@ ${tool.name === 'diary.log' ? `Example output for "Log coding from 3pm to 5pm":
         args._categoryConfidence = 'low';
       }
 
+      const adjustedArgs = applyIntentToArgs(tool.name, args, intentAnalysis);
+
       logger.info('Parameter extraction successful', { 
         toolName: tool.name, 
-        args,
+        args: adjustedArgs,
         attempt,
       });
 
       return {
         toolName: tool.name,
-        args,
+        args: adjustedArgs,
+        intentAnalysis: intentAnalysis || undefined,
       };
     } catch (error) {
       logger.error('Parameter extraction error', error, { attempt, toolName: tool.name });
@@ -620,6 +977,25 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
         data: content.data,
         mimeType: content.mimeType || 'image/png',
       });
+    }
+  }
+
+  if (
+    richContent.length === 0 &&
+    toolCall.toolName === 'diary.getTimeStats' &&
+    toolCall.intentAnalysis &&
+    (toolCall.intentAnalysis.intent === 'trend' || toolCall.intentAnalysis.output === 'chart')
+  ) {
+    const dailyBreakdown = extractDailyBreakdown(toolResult.structuredContent);
+    if (dailyBreakdown) {
+      const chartImage = await generateTrendChartImage(dailyBreakdown, toolCall.intentAnalysis);
+      if (chartImage) {
+        richContent.push({
+          type: 'image',
+          data: chartImage.data,
+          mimeType: chartImage.mimeType,
+        });
+      }
     }
   }
 
