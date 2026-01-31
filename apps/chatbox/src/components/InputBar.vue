@@ -18,6 +18,7 @@ const emit = defineEmits<{
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const showRoutingControls = ref(false);
+const isVoiceMode = ref(false);
 
 // Available services for routing
 const availableServices = computed(() => {
@@ -72,6 +73,7 @@ function handleTranscription(text: string) {
     inputText.value = text;
   }
   resizeTextarea();
+  isVoiceMode.value = false;
   // Focus the textarea so user can edit or send
   textareaRef.value?.focus();
 }
@@ -79,6 +81,13 @@ function handleTranscription(text: string) {
 function handleVoiceError(message: string) {
   console.error('Voice recording error:', message);
   // Error is already shown by VoiceRecorder component
+}
+
+function toggleVoiceMode() {
+  isVoiceMode.value = !isVoiceMode.value;
+  if (!isVoiceMode.value) {
+    textareaRef.value?.focus();
+  }
 }
 
 onMounted(() => {
@@ -130,38 +139,59 @@ onMounted(() => {
         >
           🎯
         </button>
+        <button
+          class="tool-button"
+          :class="{ active: isVoiceMode }"
+          :disabled="disabled"
+          :title="isVoiceMode ? 'Switch to typing' : 'Use voice input'"
+          @click="toggleVoiceMode"
+        >
+          {{ isVoiceMode ? '⌨️' : '🎙️' }}
+        </button>
         <button class="tool-button" :disabled="disabled" title="Emoji picker (coming soon)">
           🙂
         </button>
         <button class="tool-button" :disabled="disabled" title="Attach file (coming soon)">
           📎
         </button>
+      </div>
+      <div v-if="isVoiceMode" class="voice-hold-container">
         <VoiceRecorder
+          variant="hold"
           :disabled="disabled"
           @transcription="handleTranscription"
           @error="handleVoiceError"
         />
       </div>
-      <textarea
-      ref="textareaRef"
-      v-model="inputText"
-      class="input-field"
-      :disabled="disabled"
-      placeholder="Type a message…"
-      rows="1"
-      @keydown="handleKeydown"
-      @input="resizeTextarea"
-    />
-      <button
-        class="send-button"
-        :disabled="disabled || !inputText.trim()"
-        @click="handleSubmit"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="22" y1="2" x2="11" y2="13" />
-          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-        </svg>
-      </button>
+      <template v-else>
+        <textarea
+          ref="textareaRef"
+          v-model="inputText"
+          class="input-field"
+          :disabled="disabled"
+          placeholder="Type a message…"
+          rows="1"
+          @keydown="handleKeydown"
+          @input="resizeTextarea"
+        />
+        <button
+          class="send-button"
+          :disabled="disabled || !inputText.trim()"
+          @click="handleSubmit"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -295,6 +325,12 @@ onMounted(() => {
 .input-field::placeholder {
   color: var(--muted, #64748b);
   opacity: 0.7;
+}
+
+.voice-hold-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .send-button {

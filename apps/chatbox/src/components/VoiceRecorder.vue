@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/auth';
 
 const props = defineProps<{
   disabled?: boolean;
+  variant?: 'icon' | 'hold';
 }>();
 
 const emit = defineEmits<{
@@ -44,6 +45,7 @@ const isRecording = computed(() => state.value === 'recording');
 const isProcessing = computed(() => state.value === 'processing');
 const isRequesting = computed(() => state.value === 'requesting');
 const isActive = computed(() => state.value !== 'idle');
+const isHoldVariant = computed(() => props.variant === 'hold');
 
 const formattedDuration = computed(() => {
   const minutes = Math.floor(recordingDuration.value / 60);
@@ -333,7 +335,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="voice-recorder">
+  <div class="voice-recorder" :class="{ hold: isHoldVariant }">
     <!-- Recording Button -->
     <button
       class="voice-button"
@@ -341,6 +343,7 @@ defineExpose({
         recording: isRecording,
         processing: isProcessing,
         requesting: isRequesting,
+        hold: isHoldVariant,
       }"
       :disabled="props.disabled || isProcessing"
       :title="
@@ -405,6 +408,10 @@ defineExpose({
         <path d="M21 12a9 9 0 1 1-6.219-8.56" />
       </svg>
 
+      <span v-if="isHoldVariant" class="hold-label">
+        {{ isRecording ? 'Release to stop' : 'Hold to Talk' }}
+      </span>
+
       <!-- Recording pulse animation -->
       <span v-if="isRecording" class="pulse" />
     </button>
@@ -445,6 +452,10 @@ defineExpose({
   align-items: center;
 }
 
+.voice-recorder.hold {
+  width: 100%;
+}
+
 .voice-button {
   width: 48px;
   height: 48px;
@@ -465,12 +476,27 @@ defineExpose({
   touch-action: none;
 }
 
+.voice-button.hold {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  border-radius: 14px;
+  gap: 10px;
+  padding: 0 16px;
+  justify-content: center;
+}
+
 @media (min-width: 600px) {
   .voice-button {
     width: 52px;
     height: 52px;
     min-width: 52px;
     border-radius: 14px;
+  }
+
+  .voice-button.hold {
+    height: 56px;
+    border-radius: 16px;
   }
 }
 
@@ -517,6 +543,12 @@ defineExpose({
 .icon {
   width: 18px;
   height: 18px;
+}
+
+.hold-label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 @media (min-width: 600px) {
