@@ -356,6 +356,8 @@ defineExpose({
       @pointerdown.prevent="handlePressStart"
       @pointerup="handlePressEnd"
       @pointercancel="handlePressEnd"
+      @contextmenu.prevent
+      @selectstart.prevent
       @keydown="handleKeydown"
       @keyup="handleKeyup"
     >
@@ -457,6 +459,10 @@ defineExpose({
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
 }
 
 @media (min-width: 600px) {
