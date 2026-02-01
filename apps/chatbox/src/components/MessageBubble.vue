@@ -49,9 +49,14 @@ const markdownContents = computed(() => {
   );
 });
 
+function renderMarkdown(markdown: string): string {
+  const rendered = marked.parse(markdown, { async: false });
+  return typeof rendered === 'string' ? rendered : '';
+}
+
 const markdownHtmlBlocks = computed(() => {
   return markdownContents.value.map((block) =>
-    DOMPurify.sanitize(marked.parse(block.text || ''))
+    DOMPurify.sanitize(renderMarkdown(block.text || ''))
   );
 });
 
