@@ -184,6 +184,7 @@ export const useChatStore = defineStore('chat', () => {
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
           'workstyle': 'Workstyle',
+          'ideas-log': 'Ideas Log',
         };
         processingStatus.value = {
           stage: 'invoking',

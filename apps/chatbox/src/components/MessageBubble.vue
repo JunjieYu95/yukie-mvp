@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import type { Message } from '../stores/chat';
 
 const props = defineProps<{
@@ -19,6 +21,7 @@ const serviceDisplayName = computed(() => {
   // Convert service ID to display name
   const names: Record<string, string> = {
     'habit-tracker': 'Habit Tracker',
+    'ideas-log': 'Ideas Log',
   };
   return names[props.message.serviceUsed] || props.message.serviceUsed;
 });
@@ -37,6 +40,19 @@ const hasImages = computed(() => {
 const imageContents = computed(() => {
   if (!props.message.richContent) return [];
   return props.message.richContent.filter(c => c.type === 'image' && c.data);
+});
+
+const markdownContents = computed(() => {
+  if (!props.message.richContent) return [];
+  return props.message.richContent.filter(
+    (c) => c.type === 'text' && c.text && c.mimeType === 'text/markdown'
+  );
+});
+
+const markdownHtmlBlocks = computed(() => {
+  return markdownContents.value.map((block) =>
+    DOMPurify.sanitize(marked.parse(block.text || ''))
+  );
 });
 
 // Generate data URL for image
@@ -76,6 +92,16 @@ function getImageDataUrl(content: { data?: string; mimeType?: string }): string 
           loading="lazy"
         />
       </div>
+    </div>
+
+    <!-- Render markdown content -->
+    <div v-if="markdownHtmlBlocks.length" class="message-markdown">
+      <div
+        v-for="(html, index) in markdownHtmlBlocks"
+        :key="index"
+        class="message-markdown-block"
+        v-html="html"
+      ></div>
     </div>
 
     <div class="message-meta">
@@ -192,6 +218,44 @@ function getImageDataUrl(content: { data?: string; mimeType?: string }): string 
 .message-bubble.sending {
   opacity: 0.7;
   animation: messagePulse 1.5s ease-in-out infinite;
+}
+
+.message-markdown {
+  margin-top: 10px;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.message-markdown-block {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #0f172a;
+}
+
+.message-markdown-block h1,
+.message-markdown-block h2,
+.message-markdown-block h3,
+.message-markdown-block h4 {
+  margin-top: 0.9rem;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+.message-markdown-block pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+
+.message-markdown-block code {
+  background: #e2e8f0;
+  border-radius: 6px;
+  padding: 0.1rem 0.3rem;
 }
 
 @keyframes messagePulse {

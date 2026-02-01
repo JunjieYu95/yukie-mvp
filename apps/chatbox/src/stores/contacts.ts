@@ -57,6 +57,15 @@ const seedContacts: Contact[] = [
     unreadCount: 0,
     accent: '#22c55e',
   },
+  {
+    id: 'ideas-log',
+    name: 'Ideas Log',
+    subtitle: 'Idea capture · Research reports',
+    type: 'service',
+    status: 'online',
+    unreadCount: 0,
+    accent: '#f97316',
+  },
 ];
 
 // Available public MCP services that can be added
@@ -100,6 +109,14 @@ export const availableMCPServices: Omit<Contact, 'unreadCount' | 'lastMessage' |
     type: 'service',
     status: 'online',
     accent: '#24292e',
+  },
+  {
+    id: 'ideas-log',
+    name: 'Ideas Log',
+    subtitle: 'Idea capture · Research reports',
+    type: 'service',
+    status: 'online',
+    accent: '#f97316',
   },
 ];
 

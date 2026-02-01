@@ -969,7 +969,13 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
       .join('\n');
     response = `I encountered an issue: ${errorText || 'Unknown error'}. Please try again.`;
   } else {
-    response = await formatResponse(message, toolResult, serviceName, model);
+    const filteredForFormat = {
+      ...toolResult,
+      content: toolResult.content.filter(
+        (c) => !(c.type === 'text' && c.mimeType === 'text/markdown')
+      ),
+    };
+    response = await formatResponse(message, filteredForFormat, serviceName, model);
   }
 
   // Extract rich content (images, etc.) from tool result
@@ -986,6 +992,13 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
         type: 'image',
         data: content.data,
         mimeType: content.mimeType || 'image/png',
+      });
+    }
+    if (content.type === 'text' && content.mimeType === 'text/markdown' && content.text) {
+      richContent.push({
+        type: 'text',
+        text: content.text,
+        mimeType: 'text/markdown',
       });
     }
   }

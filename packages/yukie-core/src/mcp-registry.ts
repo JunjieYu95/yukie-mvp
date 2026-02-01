@@ -491,6 +491,28 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
         healthEndpoint: '/api/mcp',
         enabled: true,
       },
+      {
+        id: 'ideas-log',
+        name: 'Ideas Log',
+        description: 'Capture ideas and retrieve research reports with summaries and full markdown.',
+        baseUrl: process.env.IDEAS_LOG_URL || 'https://ideas-log.vercel.app',
+        mcpEndpoint:
+          process.env.IDEAS_LOG_MCP_URL ||
+          `${process.env.IDEAS_LOG_URL || 'https://ideas-log.vercel.app'}/api/mcp`,
+        capabilities: [
+          'idea capture',
+          'idea logging',
+          'idea list',
+          'idea retrieval',
+          'research report',
+          'summary',
+          'markdown report',
+          'insights',
+        ],
+        scopes: ['ideas:read', 'ideas:write'],
+        healthEndpoint: '/api/mcp',
+        enabled: true,
+      },
     ],
   };
 }
