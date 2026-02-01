@@ -45,6 +45,17 @@ function handleIdeaAction(payload: { type: 'check-status' | 'fetch-report'; idea
 function handleClear() {
   chatStore.clearConversation();
 }
+
+function handleIdeasLogAction(action: 'list' | 'fetch') {
+  if (action === 'list') {
+    chatStore.sendMessage('list ideas');
+    return;
+  }
+  const ideaId = window.prompt('Enter idea ID to fetch the report:');
+  if (ideaId && ideaId.trim()) {
+    chatStore.sendMessage(`get report for idea id ${ideaId.trim()}`);
+  }
+}
 </script>
 
 <template>
@@ -63,6 +74,14 @@ function handleClear() {
         </div>
       </div>
       <div class="header-actions">
+        <div v-if="props.contact?.id === 'ideas-log'" class="ideas-actions">
+          <button class="ideas-action-button" @click="handleIdeasLogAction('list')">
+            List ideas
+          </button>
+          <button class="ideas-action-button primary" @click="handleIdeasLogAction('fetch')">
+            Fetch report
+          </button>
+        </div>
         <button
           v-if="chatStore.messages.length > 0"
           class="clear-button"
@@ -315,6 +334,9 @@ function handleClear() {
 
 .header-actions {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .clear-button {
@@ -343,6 +365,35 @@ function handleClear() {
 
 .clear-button:active {
   transform: scale(0.96);
+}
+
+.ideas-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ideas-action-button {
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.ideas-action-button:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.ideas-action-button.primary {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  border-color: transparent;
+  color: #f8fafc;
 }
 
 .messages-container {
