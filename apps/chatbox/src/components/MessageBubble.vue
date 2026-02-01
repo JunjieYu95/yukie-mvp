@@ -71,7 +71,10 @@ const ideaId = computed(() => {
 });
 
 const showIdeaActions = computed(() => {
-  return props.message.serviceUsed === 'ideas-log' && props.message.actionInvoked === 'create_idea' && !!ideaId.value;
+  if (props.message.serviceUsed !== 'ideas-log') return false;
+  if (!ideaId.value) return false;
+  const action = props.message.actionInvoked || '';
+  return action.toLowerCase() === 'create_idea' || action === '';
 });
 
 function handleCheckStatus() {
