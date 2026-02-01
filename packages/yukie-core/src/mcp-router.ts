@@ -952,6 +952,14 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
     };
   }
 
+  if (toolCall.toolName === 'create_idea') {
+    const current = typeof toolCall.args.content === 'string' ? toolCall.args.content.trim() : '';
+    if (!current) {
+      const cleaned = message.replace(/^\\s*(create|log|save)\\s+idea\\s*:\\s*/i, '').trim();
+      toolCall.args.content = cleaned || message;
+    }
+  }
+
   // Step 4: Invoke the tool
   const toolResult = await invokeTool({
     serviceId,
