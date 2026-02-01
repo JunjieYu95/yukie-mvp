@@ -2,7 +2,7 @@
 import type { Message } from '../stores/chat';
 import MessageBubble from './MessageBubble.vue';
 
-const props = defineProps<{
+defineProps<{
   messages: Message[];
 }>();
 
