@@ -34,6 +34,14 @@ function handleSend(message: string) {
   chatStore.sendMessage(message);
 }
 
+function handleIdeaAction(payload: { type: 'check-status' | 'fetch-report'; ideaId: string }) {
+  if (payload.type === 'check-status') {
+    chatStore.sendMessage(`get idea id ${payload.ideaId}`);
+    return;
+  }
+  chatStore.sendMessage(`get report for idea id ${payload.ideaId}`);
+}
+
 function handleClear() {
   chatStore.clearConversation();
 }
@@ -66,7 +74,7 @@ function handleClear() {
     </div>
 
     <div ref="messagesContainer" class="messages-container">
-      <MessageList :messages="chatStore.messages" />
+      <MessageList :messages="chatStore.messages" @action="handleIdeaAction" />
 
       <div v-if="chatStore.messages.length === 0" class="empty-state">
         <div class="empty-icon">💬</div>

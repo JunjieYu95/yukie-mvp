@@ -17,6 +17,7 @@ export interface ChatResponse {
   asyncJobId?: string;
   serviceUsed?: string;
   actionInvoked?: string;
+  structuredContent?: unknown;
   routingDetails?: {
     targetService: string;
     tool?: string;

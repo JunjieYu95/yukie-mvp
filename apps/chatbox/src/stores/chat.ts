@@ -20,6 +20,7 @@ export interface Message {
   status: 'sending' | 'sent' | 'error';
   serviceUsed?: string;
   actionInvoked?: string;
+  structuredContent?: unknown;
   // Rich content (images, etc.)
   richContent?: MessageContent[];
 }
@@ -201,6 +202,7 @@ export const useChatStore = defineStore('chat', () => {
           content: response.response,
           serviceUsed: response.serviceUsed,
           actionInvoked: response.actionInvoked,
+          structuredContent: response.structuredContent,
           richContent: response.content,
         },
         queueItem.contactId

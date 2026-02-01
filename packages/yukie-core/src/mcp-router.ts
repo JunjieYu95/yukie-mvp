@@ -887,6 +887,7 @@ export interface MCPChatFlowResult {
     confidence: number;
     reasoning: string;
   };
+  structuredContent?: unknown;
   // Rich content (images, etc.) from MCP tool responses
   content?: Array<{
     type: 'text' | 'image';
@@ -1041,6 +1042,7 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
       confidence: routing.confidence,
       reasoning: routing.reasoning,
     },
+    structuredContent: toolResult.structuredContent,
     content: richContent.length > 0 ? richContent : undefined,
   };
 }

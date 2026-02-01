@@ -2,8 +2,12 @@
 import type { Message } from '../stores/chat';
 import MessageBubble from './MessageBubble.vue';
 
-defineProps<{
+const props = defineProps<{
   messages: Message[];
+}>();
+
+const emit = defineEmits<{
+  action: [payload: { type: 'check-status' | 'fetch-report'; ideaId: string }];
 }>();
 </script>
 
@@ -13,6 +17,7 @@ defineProps<{
       v-for="message in messages"
       :key="message.id"
       :message="message"
+      @action="emit('action', $event)"
     />
   </TransitionGroup>
 </template>

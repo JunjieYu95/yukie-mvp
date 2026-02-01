@@ -8,6 +8,10 @@ const props = defineProps<{
   message: Message;
 }>();
 
+const emit = defineEmits<{
+  action: [payload: { type: 'check-status' | 'fetch-report'; ideaId: string }];
+}>();
+
 const isUser = computed(() => props.message.role === 'user');
 const isSystem = computed(() => props.message.role === 'system');
 
@@ -60,6 +64,26 @@ const markdownHtmlBlocks = computed(() => {
   );
 });
 
+const ideaId = computed(() => {
+  const structured = props.message.structuredContent as { idea?: { id?: string | number } } | undefined;
+  if (structured?.idea?.id) return String(structured.idea.id);
+  return null;
+});
+
+const showIdeaActions = computed(() => {
+  return props.message.serviceUsed === 'ideas-log' && props.message.actionInvoked === 'create_idea' && !!ideaId.value;
+});
+
+function handleCheckStatus() {
+  if (!ideaId.value) return;
+  emit('action', { type: 'check-status', ideaId: ideaId.value });
+}
+
+function handleFetchReport() {
+  if (!ideaId.value) return;
+  emit('action', { type: 'fetch-report', ideaId: ideaId.value });
+}
+
 // Generate data URL for image
 function getImageDataUrl(content: { data?: string; mimeType?: string }): string {
   const mimeType = content.mimeType || 'image/png';
@@ -107,6 +131,15 @@ function getImageDataUrl(content: { data?: string; mimeType?: string }): string 
         class="message-markdown-block"
         v-html="html"
       ></div>
+    </div>
+
+    <div v-if="showIdeaActions" class="idea-actions">
+      <button class="idea-action-button" @click="handleCheckStatus">
+        Check status
+      </button>
+      <button class="idea-action-button primary" @click="handleFetchReport">
+        Fetch report
+      </button>
     </div>
 
     <div class="message-meta">
@@ -261,6 +294,35 @@ function getImageDataUrl(content: { data?: string; mimeType?: string }): string 
   background: #e2e8f0;
   border-radius: 6px;
   padding: 0.1rem 0.3rem;
+}
+
+.idea-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.idea-action-button {
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.idea-action-button:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.idea-action-button.primary {
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  border-color: transparent;
+  color: #f8fafc;
 }
 
 @keyframes messagePulse {
