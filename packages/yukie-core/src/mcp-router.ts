@@ -480,7 +480,8 @@ interface SelectedToolCall {
 export async function selectToolParameters(
   userMessage: string,
   tool: MCPTool,
-  model?: string
+  model?: string,
+  utcOffsetMinutes?: number
 ): Promise<SelectedToolCall | null> {
   // =========================================================================
   // MOMENTUM: Direct pattern matching for simple phrases (skip LLM)
@@ -599,18 +600,27 @@ Otherwise include "categoryConfidence": "high".
 `;
   }
 
-  function formatDateLocal(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+  function formatDateLocal(date: Date, offsetMinutes?: number): string {
+    // If UTC offset is provided, adjust the date to user's local time
+    let targetDate = date;
+    if (offsetMinutes !== undefined) {
+      // offsetMinutes is positive for timezones ahead of UTC (e.g., UTC+8 = 480)
+      // and negative for timezones behind UTC (e.g., UTC-5 = -300)
+      const utcMs = date.getTime() + date.getTimezoneOffset() * 60000; // Convert to UTC
+      const localMs = utcMs + offsetMinutes * 60000; // Apply user's offset
+      targetDate = new Date(localMs);
+    }
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
   async function analyzeUserIntent(message: string) {
-    const today = formatDateLocal(new Date());
+    const today = formatDateLocal(new Date(), utcOffsetMinutes);
     const prompt = `You are an intent and time-range analyst for an assistant.
 
-Today is ${today} (use this to resolve relative dates).
+Today is ${today} (this is the user's local date - use this to resolve relative dates).
 
 Given the user message, extract:
 - intent: one of ["log", "query", "summary", "trend", "chart", "other"]
@@ -911,7 +921,7 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
   const { tool, serviceId, serviceName } = routing.selectedTool;
 
   // Step 3: Extract parameters for the tool
-  const toolCall = await selectToolParameters(message, tool, model);
+  const toolCall = await selectToolParameters(message, tool, model, auth.utcOffsetMinutes);
 
   if (!toolCall) {
     // Parameter extraction failed - provide a helpful message instead of generic fallback
