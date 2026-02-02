@@ -204,7 +204,7 @@ export async function transcribeAudio(
 // ============================================================================
 
 export async function getInbox(
-  token: string,
+  token?: string,
   limit: number = 50,
   offset: number = 0
 ): Promise<InboxListResponse> {
@@ -215,7 +215,7 @@ export async function getInbox(
   );
 }
 
-export async function getInboxJob(token: string, jobId: string): Promise<InboxJob> {
+export async function getInboxJob(token: string | undefined, jobId: string): Promise<InboxJob> {
   return request<InboxJob>(
     `/inbox/${jobId}`,
     { method: 'GET' },
@@ -223,7 +223,7 @@ export async function getInboxJob(token: string, jobId: string): Promise<InboxJo
   );
 }
 
-export async function getInboxStats(token: string): Promise<InboxStats> {
+export async function getInboxStats(token?: string): Promise<InboxStats> {
   return request<InboxStats>(
     '/inbox/stats',
     { method: 'GET' },

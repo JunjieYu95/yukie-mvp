@@ -10,7 +10,6 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@openclaw/gateway-client": "file:../../../openclaw/packages/gateway-client",
     "dompurify": "^3.3.1",
     "marked": "^17.0.1",
     "pinia": "^2.1.7",

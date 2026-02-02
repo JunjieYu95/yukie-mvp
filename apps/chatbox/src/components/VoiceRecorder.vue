@@ -201,7 +201,7 @@ async function processRecording() {
     cleanup();
 
     // Send to transcription API
-    const result = await transcribeAudio(audioBlob, authStore.token || undefined);
+    const result = await transcribeAudio(audioBlob, undefined);
 
     if (result.text && result.text.trim()) {
       emit('transcription', result.text.trim());

@@ -49,7 +49,9 @@ export async function createOpenClawClient(
   connected: boolean;
 }> {
   try {
-    const mod = await import("@openclaw/gateway-client");
+    const moduleName = "@openclaw/gateway-client";
+    // Avoid bundler resolution in production; only needed for local dev.
+    const mod = await import(/* @vite-ignore */ moduleName);
     const { OpenClawGatewayClient } = mod;
 
     const client = new OpenClawGatewayClient({

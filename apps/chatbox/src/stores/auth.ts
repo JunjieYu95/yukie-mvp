@@ -39,7 +39,6 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = null;
       userId.value = null;
       scopes.value = [];
-      localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_ID_KEY);
     }
   }

@@ -170,14 +170,6 @@ export const useChatStore = defineStore('chat', () => {
     return { url, token };
   }
 
-  function getOpenClawConfig() {
-    const config = tryGetOpenClawConfig();
-    if (!config) {
-      throw new Error('OpenClaw is not configured. Set VITE_OPENCLAW_GATEWAY_URL and VITE_OPENCLAW_TOKEN.');
-    }
-    return config;
-  }
-
   async function refreshOpenClawStatus() {
     const config = tryGetOpenClawConfig();
     const canUseProxy = authStore.isAuthenticated;
@@ -313,7 +305,7 @@ export const useChatStore = defineStore('chat', () => {
       const response = await sendChatMessage(
         queueItem.content,
         conversationId,
-        authStore.token!,
+        undefined,
         settingsStore.selectedModel,
         queueItem.targetService || undefined
       );

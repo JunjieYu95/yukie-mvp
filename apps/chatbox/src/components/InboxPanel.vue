@@ -18,13 +18,13 @@ onMounted(async () => {
 });
 
 async function loadInbox() {
-  if (!authStore.token) return;
+  if (!authStore.isAuthenticated) return;
 
   isLoading.value = true;
   error.value = null;
 
   try {
-    const response = await getInbox(authStore.token);
+    const response = await getInbox();
     jobs.value = response.jobs;
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load inbox';
