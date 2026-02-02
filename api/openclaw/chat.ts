@@ -71,6 +71,15 @@ function extractDeltaText(payload: ChatEventPayload): string {
   return textBlock?.text || '';
 }
 
+function extractFullText(payload: ChatEventPayload): string {
+  const blocks = payload.message?.content;
+  if (!blocks || blocks.length === 0) return '';
+  return blocks
+    .filter((b) => b?.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text)
+    .join('');
+}
+
 async function openclawConnect(ws: WebSocket, token: string): Promise<void> {
   const id = crypto.randomUUID();
   const frame: RpcFrame = {
@@ -237,6 +246,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const text = extractDeltaText(payload);
           if (text) lastText = text;
         } else if (payload.state === 'final') {
+          const finalText = extractFullText(payload);
+          if (finalText) lastText = finalText;
           clearTimeout(timeout);
           ws.off('message', onMessage);
           resolve();
