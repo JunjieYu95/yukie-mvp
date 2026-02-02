@@ -1,13 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateRequest, hasScope } from '../_lib/auth.js';
-import { OpenClawGatewayClient } from '@openclaw/gateway-client';
-import WebSocket from 'ws';
 import * as crypto from 'crypto';
+import WebSocket from 'ws';
+import { authenticateRequest, hasScope } from '../_lib/auth.js';
 
 type ChatRequest = {
   message: string;
   sessionKey?: string;
 };
+
+type RpcFrame =
+  | { type: 'req'; id: string; method: string; params?: unknown }
+  | { type: 'res'; id: string; ok: boolean; result?: unknown; error?: { message?: string } }
+  | { type: 'event'; event: string; payload?: unknown };
 
 type ChatEventPayload = {
   runId?: string;
@@ -67,6 +71,94 @@ function extractDeltaText(payload: ChatEventPayload): string {
   return textBlock?.text || '';
 }
 
+async function openclawConnect(ws: WebSocket, token: string): Promise<void> {
+  const id = crypto.randomUUID();
+  const frame: RpcFrame = {
+    type: 'req',
+    id,
+    method: 'connect',
+    params: {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: {
+        id: 'webchat-ui',
+        version: '1.0.0',
+        platform: 'node',
+        mode: 'webchat',
+      },
+      role: 'operator',
+      scopes: ['operator.admin', 'operator.approvals', 'operator.pairing'],
+      caps: [],
+      auth: { token },
+    },
+  };
+
+  const result = await new Promise<RpcFrame>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('connect timeout')), 30_000);
+    const onMessage = (data: WebSocket.RawData) => {
+      try {
+        const parsed = JSON.parse(String(data)) as RpcFrame;
+        if (parsed.type === 'res' && parsed.id === id) {
+          clearTimeout(timeout);
+          ws.off('message', onMessage);
+          resolve(parsed);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    ws.on('message', onMessage);
+    ws.send(JSON.stringify(frame));
+  });
+
+  if (result.type !== 'res' || !result.ok) {
+    throw new Error(result.type === 'res' ? result.error?.message || 'connect failed' : 'connect failed');
+  }
+}
+
+async function openclawSendMessage(
+  ws: WebSocket,
+  sessionKey: string,
+  message: string
+): Promise<{ runId?: string }> {
+  const id = crypto.randomUUID();
+  const frame: RpcFrame = {
+    type: 'req',
+    id,
+    method: 'chat.send',
+    params: {
+      sessionKey,
+      message,
+      deliver: false,
+      idempotencyKey: crypto.randomUUID(),
+    },
+  };
+
+  const result = await new Promise<RpcFrame>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('chat.send timeout')), 30_000);
+    const onMessage = (data: WebSocket.RawData) => {
+      try {
+        const parsed = JSON.parse(String(data)) as RpcFrame;
+        if (parsed.type === 'res' && parsed.id === id) {
+          clearTimeout(timeout);
+          ws.off('message', onMessage);
+          resolve(parsed);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    ws.on('message', onMessage);
+    ws.send(JSON.stringify(frame));
+  });
+
+  if (result.type !== 'res' || !result.ok) {
+    throw new Error(result.type === 'res' ? result.error?.message || 'chat.send failed' : 'chat.send failed');
+  }
+
+  return result.result as { runId?: string };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
 
@@ -110,50 +202,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const gatewayToken = requireEnv('OPENCLAW_GATEWAY_TOKEN');
   const sessionKey = body.sessionKey || 'main';
 
-  // Provide WebSocket for gateway client in Node.
-  // @ts-expect-error - Node global WebSocket is not typed in this environment
-  globalThis.WebSocket = WebSocket;
-
-  let onEvent: ((evt: { event: string; payload?: unknown }) => void) | null = null;
-
-  const client = new OpenClawGatewayClient({
-    url: gatewayUrl,
-    token: gatewayToken,
-    clientId: 'webchat-ui',
-    platform: 'node',
-    onEvent: (evt) => onEvent?.(evt),
-  });
-
+  const ws = new WebSocket(gatewayUrl);
   let lastText = '';
-  let runId: string | null = null;
+  let runId: string | undefined;
 
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('OpenClaw timeout')), 30_000);
-
-      client.start();
-
-      client.waitForHello()
-        .then(resolve)
-        .catch(reject)
-        .finally(() => clearTimeout(timeout));
+      ws.on('open', () => resolve());
+      ws.on('error', (err) => reject(err));
+      setTimeout(() => reject(new Error('socket open timeout')), 20_000);
     });
 
-    const result = (await client.request('chat.send', {
-      sessionKey,
-      message: body.message,
-      deliver: false,
-      idempotencyKey: crypto.randomUUID(),
-    })) as { runId?: string };
-
-    runId = result.runId || null;
+    await openclawConnect(ws, gatewayToken);
+    const result = await openclawSendMessage(ws, sessionKey, body.message);
+    runId = result.runId;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('OpenClaw response timeout')), 60_000);
-
-      onEvent = (evt: { event: string; payload?: unknown }) => {
-        if (evt.event !== 'chat') return;
-        const payload = evt.payload as ChatEventPayload;
+      const onMessage = (data: WebSocket.RawData) => {
+        let parsed: RpcFrame;
+        try {
+          parsed = JSON.parse(String(data)) as RpcFrame;
+        } catch {
+          return;
+        }
+        if (parsed.type !== 'event' || parsed.event !== 'chat') return;
+        const payload = parsed.payload as ChatEventPayload;
         if (runId && payload.runId && payload.runId !== runId) return;
 
         if (payload.state === 'delta') {
@@ -161,22 +235,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (text) lastText = text;
         } else if (payload.state === 'final') {
           clearTimeout(timeout);
+          ws.off('message', onMessage);
           resolve();
         } else if (payload.state === 'error') {
           clearTimeout(timeout);
+          ws.off('message', onMessage);
           reject(new Error(payload.errorMessage || 'OpenClaw error'));
         } else if (payload.state === 'aborted') {
           clearTimeout(timeout);
+          ws.off('message', onMessage);
           reject(new Error('OpenClaw message aborted'));
         }
       };
-
+      ws.on('message', onMessage);
     });
 
     res.status(200).json({ text: lastText, runId });
   } catch (err) {
-    res.status(500).json({ error: 'OpenClaw proxy failed', message: err instanceof Error ? err.message : String(err) });
+    res.status(500).json({
+      error: 'OpenClaw proxy failed',
+      message: err instanceof Error ? err.message : String(err),
+    });
   } finally {
-    client.stop();
+    ws.close();
   }
 }

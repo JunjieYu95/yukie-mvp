@@ -1,8 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticateRequest, hasScope } from '../_lib/auth.js';
-import { OpenClawGatewayClient } from '@openclaw/gateway-client';
-import WebSocket from 'ws';
 import * as crypto from 'crypto';
+import WebSocket from 'ws';
+import { authenticateRequest, hasScope } from '../_lib/auth.js';
+
+type RpcFrame =
+  | { type: 'req'; id: string; method: string; params?: unknown }
+  | { type: 'res'; id: string; ok: boolean; result?: unknown; error?: { message?: string } };
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -47,6 +50,51 @@ function hasValidProxySecret(req: VercelRequest): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
+async function openclawConnect(ws: WebSocket, token: string): Promise<void> {
+  const id = crypto.randomUUID();
+  const frame: RpcFrame = {
+    type: 'req',
+    id,
+    method: 'connect',
+    params: {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: {
+        id: 'webchat-ui',
+        version: '1.0.0',
+        platform: 'node',
+        mode: 'webchat',
+      },
+      role: 'operator',
+      scopes: ['operator.admin', 'operator.approvals', 'operator.pairing'],
+      caps: [],
+      auth: { token },
+    },
+  };
+
+  const result = await new Promise<RpcFrame>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('connect timeout')), 20_000);
+    const onMessage = (data: WebSocket.RawData) => {
+      try {
+        const parsed = JSON.parse(String(data)) as RpcFrame;
+        if (parsed.type === 'res' && parsed.id === id) {
+          clearTimeout(timeout);
+          ws.off('message', onMessage);
+          resolve(parsed);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    ws.on('message', onMessage);
+    ws.send(JSON.stringify(frame));
+  });
+
+  if (result.type !== 'res' || !result.ok) {
+    throw new Error(result.type === 'res' ? result.error?.message || 'connect failed' : 'connect failed');
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res);
 
@@ -84,20 +132,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const gatewayUrl = requireEnv('OPENCLAW_GATEWAY_URL');
     const gatewayToken = requireEnv('OPENCLAW_GATEWAY_TOKEN');
 
-    // @ts-expect-error - Node global WebSocket is not typed in this environment
-    globalThis.WebSocket = WebSocket;
-
-    const client = new OpenClawGatewayClient({
-      url: gatewayUrl,
-      token: gatewayToken,
-      clientId: 'webchat-ui',
-      platform: 'node',
+    const ws = new WebSocket(gatewayUrl);
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', () => resolve());
+      ws.on('error', (err) => reject(err));
+      setTimeout(() => reject(new Error('socket open timeout')), 15_000);
     });
 
-    client.start();
-    await client.waitForHello();
+    await openclawConnect(ws, gatewayToken);
+    ws.close();
+
     res.status(200).json({ connected: true });
-    client.stop();
   } catch (err) {
     res.status(200).json({
       connected: false,
