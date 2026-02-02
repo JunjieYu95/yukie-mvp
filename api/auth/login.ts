@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateToken, SCOPES } from '../../packages/shared/auth/src/auth';
 import { verifyPassword } from '../_lib/password.js';
+import * as crypto from 'crypto';
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -18,6 +18,58 @@ function requireEnv(name: string): string {
     throw new Error(`Missing required env: ${name}`);
   }
   return value;
+}
+
+const SCOPES = [
+  'habit:read',
+  'habit:write',
+  'habit:delete',
+  'yukie:chat',
+  'yukie:inbox',
+  'admin',
+];
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  return secret;
+}
+
+function base64UrlEncode(data: string): string {
+  return Buffer.from(data)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function hmacSign(message: string, secret: string): string {
+  const hmac = crypto.createHmac('sha256', secret);
+  hmac.update(message);
+  return hmac.digest('base64url');
+}
+
+function generateToken(userId: string, scopes: string[], expiresInDays: number = 7): string {
+  const secret = getJwtSecret();
+  const now = Math.floor(Date.now() / 1000);
+  const expirySeconds = expiresInDays * 24 * 60 * 60;
+
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const payload = {
+    sub: userId,
+    scopes,
+    iat: now,
+    exp: now + expirySeconds,
+  };
+
+  const headerEncoded = base64UrlEncode(JSON.stringify(header));
+  const payloadEncoded = base64UrlEncode(JSON.stringify(payload));
+  const message = `${headerEncoded}.${payloadEncoded}`;
+  const signature = hmacSign(message, secret);
+
+  return `${message}.${signature}`;
 }
 
 function getCookieOptions() {
@@ -70,20 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const userId = process.env.APP_USER_ID || 'owner';
-    const scopes = [
-      SCOPES.YUKIE_CHAT,
-      SCOPES.YUKIE_INBOX,
-      SCOPES.HABIT_READ,
-      SCOPES.HABIT_WRITE,
-      SCOPES.HABIT_DELETE,
-      SCOPES.ADMIN,
-    ];
-
-    const token = await generateToken({
-      userId,
-      scopes,
-      expiresIn: '7d',
-    });
+    const scopes = SCOPES;
+    const token = generateToken(userId, scopes, 7);
 
     const { maxAgeSeconds, secure } = getCookieOptions();
     const cookies = [
