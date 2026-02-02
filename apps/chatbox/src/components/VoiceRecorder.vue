@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
 import { transcribeAudio } from '../lib/api';
-import { useAuthStore } from '../stores/auth';
 
 // ============================================================================
 // Props & Emits
@@ -21,7 +20,6 @@ const emit = defineEmits<{
 // State
 // ============================================================================
 
-const authStore = useAuthStore();
 
 type RecordingState = 'idle' | 'requesting' | 'recording' | 'processing';
 
