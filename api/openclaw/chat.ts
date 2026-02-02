@@ -156,7 +156,10 @@ async function openclawSendMessage(
     throw new Error(result.type === 'res' ? result.error?.message || 'chat.send failed' : 'chat.send failed');
   }
 
-  return result.result as { runId?: string };
+  if (result.result && typeof result.result === 'object') {
+    return result.result as { runId?: string };
+  }
+  return {};
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -215,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await openclawConnect(ws, gatewayToken);
     const result = await openclawSendMessage(ws, sessionKey, body.message);
-    runId = result.runId;
+    runId = result?.runId;
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('OpenClaw response timeout')), 60_000);
