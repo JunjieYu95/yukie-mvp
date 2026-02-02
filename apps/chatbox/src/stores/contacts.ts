@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 export type ContactType = 'assistant' | 'service' | 'system';
+export type ContactTransport = 'yukie' | 'openclaw';
 export type ContactStatus = 'online' | 'away' | 'offline';
 
 export interface Contact {
@@ -10,6 +11,7 @@ export interface Contact {
   type: ContactType;
   subtitle?: string;
   status: ContactStatus;
+  transport?: ContactTransport;
   lastMessage?: string;
   lastMessageAt?: Date;
   unreadCount: number;
@@ -27,8 +29,20 @@ const seedContacts: Contact[] = [
     status: 'online',
     unreadCount: 0,
     pinned: true,
+    transport: 'yukie',
     accent: '#0f766e',
     avatarUrl: '/icons/yukie-avatar.png',
+  },
+  {
+    id: 'openclaw',
+    name: 'OpenClaw',
+    subtitle: 'Local assistant gateway',
+    type: 'assistant',
+    status: 'online',
+    unreadCount: 0,
+    pinned: true,
+    transport: 'openclaw',
+    accent: '#111827',
   },
   {
     id: 'diary-analyzer',
@@ -37,6 +51,7 @@ const seedContacts: Contact[] = [
     type: 'service',
     status: 'online',
     unreadCount: 0,
+    transport: 'yukie',
     accent: '#8b5cf6',
   },
   {
@@ -46,6 +61,7 @@ const seedContacts: Contact[] = [
     type: 'service',
     status: 'away',
     unreadCount: 0,
+    transport: 'yukie',
     accent: '#06b6d4',
   },
   {
@@ -55,6 +71,7 @@ const seedContacts: Contact[] = [
     type: 'service',
     status: 'online',
     unreadCount: 0,
+    transport: 'yukie',
     accent: '#22c55e',
   },
   {
@@ -64,6 +81,7 @@ const seedContacts: Contact[] = [
     type: 'service',
     status: 'online',
     unreadCount: 0,
+    transport: 'yukie',
     accent: '#f97316',
   },
 ];

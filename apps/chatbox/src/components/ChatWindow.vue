@@ -56,6 +56,19 @@ function handleIdeasLogAction(action: 'list' | 'fetch') {
     chatStore.sendMessage(`get report for idea id ${ideaId.trim()}`);
   }
 }
+
+function openclawStatusLabel() {
+  switch (chatStore.openclawStatus) {
+    case 'online':
+      return 'Connected';
+    case 'connecting':
+      return 'Connecting…';
+    case 'not_configured':
+      return 'Not configured';
+    default:
+      return 'Offline';
+  }
+}
 </script>
 
 <template>
@@ -74,6 +87,14 @@ function handleIdeasLogAction(action: 'list' | 'fetch') {
         </div>
       </div>
       <div class="header-actions">
+        <div v-if="props.contact?.id === 'openclaw'" class="openclaw-status">
+          <span class="status-pill" :class="`status-${chatStore.openclawStatus}`">
+            {{ openclawStatusLabel() }}
+          </span>
+          <span v-if="chatStore.openclawStatusDetail" class="status-detail">
+            {{ chatStore.openclawStatusDetail }}
+          </span>
+        </div>
         <div v-if="props.contact?.id === 'ideas-log'" class="ideas-actions">
           <button class="ideas-action-button" @click="handleIdeasLogAction('list')">
             List ideas
@@ -337,6 +358,55 @@ function handleIdeasLogAction(action: 'list' | 'fetch') {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.openclaw-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.status-pill {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid transparent;
+}
+
+.status-pill.status-online {
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.status-pill.status-connecting {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.status-pill.status-not_configured {
+  color: #9f1239;
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.status-pill.status-offline {
+  color: #374151;
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.status-detail {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clear-button {

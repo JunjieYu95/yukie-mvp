@@ -7,7 +7,6 @@ export interface AuthState {
   scopes: string[];
 }
 
-const TOKEN_KEY = 'yukie_token';
 const USER_ID_KEY = 'yukie_user_id';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -15,57 +14,62 @@ export const useAuthStore = defineStore('auth', () => {
   const userId = ref<string | null>(null);
   const scopes = ref<string[]>([]);
 
-  const isAuthenticated = computed(() => !!token.value && !!userId.value);
+  const isAuthenticated = computed(() => !!userId.value);
 
   function initialize() {
-    // Load from localStorage
-    const savedToken = localStorage.getItem(TOKEN_KEY);
     const savedUserId = localStorage.getItem(USER_ID_KEY);
-
-    if (savedToken && savedUserId) {
-      token.value = savedToken;
+    if (savedUserId) {
       userId.value = savedUserId;
-      // Decode scopes from token (simplified - in production, properly decode JWT)
-      scopes.value = ['yukie:chat', 'yukie:inbox', 'habit:read', 'habit:write'];
     }
+    refreshSession();
   }
 
-  function setAuth(newToken: string, newUserId: string, newScopes: string[] = []) {
-    token.value = newToken;
+  function setAuth(newUserId: string, newScopes: string[] = []) {
     userId.value = newUserId;
     scopes.value = newScopes;
-
-    localStorage.setItem(TOKEN_KEY, newToken);
     localStorage.setItem(USER_ID_KEY, newUserId);
   }
 
-  function logout() {
-    token.value = null;
-    userId.value = null;
-    scopes.value = [];
-
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_ID_KEY);
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    } finally {
+      token.value = null;
+      userId.value = null;
+      scopes.value = [];
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_ID_KEY);
+    }
   }
 
-  // Dev login for testing
-  async function loginDev() {
+  async function refreshSession() {
     try {
-      // Call the dev token endpoint
-      const response = await fetch('/api/auth/dev-token', {
+      const response = await fetch('/api/auth/me', { method: 'GET' });
+      if (!response.ok) return;
+      const data = (await response.json()) as { userId?: string; scopes?: string[] };
+      if (data.userId) {
+        setAuth(data.userId, data.scopes || []);
+      }
+    } catch (error) {
+      console.error('Failed to refresh session:', error);
+    }
+  }
+
+  async function login(password: string) {
+    try {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          userId: `dev-user-${Date.now()}`,
-        }),
+        body: JSON.stringify({ password }),
       });
 
-      // Read the response body once
       const contentType = response.headers.get('content-type') || '';
       const isJson = contentType.includes('application/json');
-      
+
       let data: any;
       if (isJson) {
         data = await response.json();
@@ -76,15 +80,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Check if response was successful after parsing
       if (!response.ok) {
-        const errorMessage = data.message || data.error || 'Failed to generate token';
+        const errorMessage = data.message || data.error || 'Failed to login';
         throw new Error(errorMessage);
       }
 
-      // Success - set auth
-      setAuth(data.token, data.userId, data.scopes || []);
+      if (data.userId) {
+        setAuth(data.userId, data.scopes || []);
+      }
     } catch (error) {
       console.error('Failed to login:', error);
-      // Re-throw so the UI can handle it
       throw error;
     }
   }
@@ -103,9 +107,10 @@ export const useAuthStore = defineStore('auth', () => {
     scopes,
     isAuthenticated,
     initialize,
+    refreshSession,
     setAuth,
     logout,
-    loginDev,
+    login,
     hasScope,
     hasScopes,
   };

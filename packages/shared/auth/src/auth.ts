@@ -174,6 +174,7 @@ export interface AuthenticateRequestOptions {
   yukieUserIdHeader?: string;
   yukieScopesHeader?: string;
   yukieRequestIdHeader?: string;
+  cookieHeader?: string;
 }
 
 export interface AuthenticateResult {
@@ -183,13 +184,43 @@ export interface AuthenticateResult {
 }
 
 export async function authenticateRequest(options: AuthenticateRequestOptions): Promise<AuthenticateResult> {
-  const { authorizationHeader, yukieUserIdHeader, yukieScopesHeader, yukieRequestIdHeader } = options;
+  const {
+    authorizationHeader,
+    yukieUserIdHeader,
+    yukieScopesHeader,
+    yukieRequestIdHeader,
+    cookieHeader,
+  } = options;
+
+  const cookies = (cookieHeader || '').split(';').reduce<Record<string, string>>((acc, part) => {
+    const [key, ...rest] = part.trim().split('=');
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
 
   // Check for Bearer token
   if (authorizationHeader?.startsWith('Bearer ')) {
     const token = authorizationHeader.slice(7);
     const result = await validateToken(token);
 
+    if (!result.valid || !result.payload) {
+      return { success: false, error: result.error || 'Invalid token' };
+    }
+
+    return {
+      success: true,
+      context: {
+        userId: result.payload.sub,
+        scopes: result.payload.scopes,
+        requestId: yukieRequestIdHeader,
+      },
+    };
+  }
+
+  // Check for session cookie
+  if (cookies.yukie_session) {
+    const result = await validateToken(cookies.yukie_session);
     if (!result.valid || !result.payload) {
       return { success: false, error: result.error || 'Invalid token' };
     }
@@ -229,6 +260,7 @@ export interface AuthMiddlewareRequest {
     'x-yukie-user-id'?: string;
     'x-yukie-scopes'?: string;
     'x-yukie-request-id'?: string;
+    cookie?: string;
   };
   auth?: AuthContext;
 }
@@ -251,6 +283,7 @@ export function createAuthMiddleware(requiredScopes?: string[]) {
       yukieUserIdHeader: req.headers['x-yukie-user-id'],
       yukieScopesHeader: req.headers['x-yukie-scopes'],
       yukieRequestIdHeader: req.headers['x-yukie-request-id'],
+      cookieHeader: req.headers.cookie,
     });
 
     if (!result.success || !result.context) {

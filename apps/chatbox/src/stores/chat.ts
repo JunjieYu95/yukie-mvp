@@ -4,6 +4,14 @@ import { useAuthStore } from './auth';
 import { useSettingsStore } from './settings';
 import { useContactsStore } from './contacts';
 import { sendChatMessage } from '../lib/api';
+import {
+  openclawCheckConnection,
+  openclawCheckConnectionProxy,
+  openclawSendMessage,
+  openclawSendMessageProxy,
+  setOpenClawChatEventHandler,
+  stopOpenClawClient,
+} from '../lib/api-openclaw';
 
 export interface MessageContent {
   type: 'text' | 'image';
@@ -47,6 +55,10 @@ export const useChatStore = defineStore('chat', () => {
     service?: string;
     action?: string;
   } | null>(null);
+  const openclawActiveMessageId = ref<string | null>(null);
+  const openclawLastTextByMessageId = ref<Record<string, string>>({});
+  const openclawStatus = ref<'online' | 'offline' | 'connecting' | 'not_configured'>('offline');
+  const openclawStatusDetail = ref<string | null>(null);
 
   // Target service for manual routing control
   const targetService = ref<string | null>(null);
@@ -141,6 +153,55 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function setMessageContent(messageId: string, content: string) {
+    for (const conversation of conversations.value.values()) {
+      const message = conversation.messages.find((m) => m.id === messageId);
+      if (message) {
+        message.content = content;
+        return;
+      }
+    }
+  }
+
+  function tryGetOpenClawConfig() {
+    const url = import.meta.env.VITE_OPENCLAW_GATEWAY_URL as string | undefined;
+    const token = import.meta.env.VITE_OPENCLAW_TOKEN as string | undefined;
+    if (!url || !token) return null;
+    return { url, token };
+  }
+
+  function getOpenClawConfig() {
+    const config = tryGetOpenClawConfig();
+    if (!config) {
+      throw new Error('OpenClaw is not configured. Set VITE_OPENCLAW_GATEWAY_URL and VITE_OPENCLAW_TOKEN.');
+    }
+    return config;
+  }
+
+  async function refreshOpenClawStatus() {
+    const config = tryGetOpenClawConfig();
+    const canUseProxy = authStore.isAuthenticated;
+
+    openclawStatus.value = 'connecting';
+    openclawStatusDetail.value = null;
+    try {
+      if (config) {
+        const res = await openclawCheckConnection(config);
+        openclawStatus.value = res.connected ? 'online' : 'offline';
+      } else if (canUseProxy) {
+        const res = await openclawCheckConnectionProxy(authStore.token);
+        openclawStatus.value = res.connected ? 'online' : 'offline';
+        openclawStatusDetail.value = res.message || null;
+      } else {
+        openclawStatus.value = 'not_configured';
+        openclawStatusDetail.value = 'Missing gateway URL/token';
+      }
+    } catch (err) {
+      openclawStatus.value = 'offline';
+      openclawStatusDetail.value = err instanceof Error ? err.message : 'Connection failed';
+    }
+  }
+
   async function processQueuedMessage(queueItem: {
     content: string;
     contactId: string;
@@ -168,6 +229,86 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const conversationId = ensureConversation(queueItem.contactId);
+      const activeContact = contactsStore.contacts.find((c) => c.id === queueItem.contactId);
+
+      if (activeContact?.transport === 'openclaw') {
+        openclawStatus.value = 'connecting';
+        openclawStatusDetail.value = null;
+
+        const config = tryGetOpenClawConfig();
+        const canUseProxy = authStore.isAuthenticated;
+
+        if (!config && !canUseProxy) {
+          throw new Error('OpenClaw is not configured. Set VITE_OPENCLAW_GATEWAY_URL and VITE_OPENCLAW_TOKEN.');
+        }
+
+        if (config) {
+          const assistantMessage = addMessage(
+            {
+              role: 'assistant',
+              content: '',
+            },
+            queueItem.contactId
+          );
+
+          openclawActiveMessageId.value = assistantMessage.id;
+          setOpenClawChatEventHandler((evt) => {
+            if (openclawActiveMessageId.value !== assistantMessage.id) return;
+            if (evt.state === 'delta' && evt.text) {
+              const lastText = openclawLastTextByMessageId.value[assistantMessage.id] || '';
+              if (evt.text !== lastText) {
+                setMessageContent(assistantMessage.id, evt.text);
+                openclawLastTextByMessageId.value[assistantMessage.id] = evt.text;
+              }
+            } else if (evt.state === 'final') {
+              openclawActiveMessageId.value = null;
+              delete openclawLastTextByMessageId.value[assistantMessage.id];
+              setOpenClawChatEventHandler(null);
+            } else if (evt.state === 'aborted') {
+              addMessage(
+                {
+                  role: 'system',
+                  content: 'OpenClaw message aborted.',
+                },
+                queueItem.contactId
+              );
+              openclawActiveMessageId.value = null;
+              delete openclawLastTextByMessageId.value[assistantMessage.id];
+              setOpenClawChatEventHandler(null);
+            } else if (evt.state === 'error') {
+              addMessage(
+                {
+                  role: 'system',
+                  content: evt.error || 'OpenClaw error.',
+                },
+                queueItem.contactId
+              );
+              openclawActiveMessageId.value = null;
+              delete openclawLastTextByMessageId.value[assistantMessage.id];
+              setOpenClawChatEventHandler(null);
+            }
+          });
+
+          processingStatus.value = { stage: 'invoking', service: 'OpenClaw' };
+          await openclawSendMessage(config, queueItem.content, 'main');
+          openclawStatus.value = 'online';
+        } else {
+          processingStatus.value = { stage: 'invoking', service: 'OpenClaw' };
+          const proxyResponse = await openclawSendMessageProxy(authStore.token, queueItem.content, 'main');
+          addMessage(
+            {
+              role: 'assistant',
+              content: proxyResponse.text || '',
+            },
+            queueItem.contactId
+          );
+          openclawStatus.value = 'online';
+        }
+
+        updateMessage(queueItem.userMessageId, { status: 'sent' });
+        clearInterval(progressInterval);
+        return;
+      }
 
       const response = await sendChatMessage(
         queueItem.content,
@@ -236,6 +377,13 @@ export const useChatStore = defineStore('chat', () => {
         conversationByContactId.value.set(queueItem.contactId, response.conversationId);
       }
     } catch (err) {
+      if (openclawActiveMessageId.value) {
+        openclawActiveMessageId.value = null;
+        setOpenClawChatEventHandler(null);
+        stopOpenClawClient();
+      }
+      openclawStatus.value = 'offline';
+      openclawStatusDetail.value = err instanceof Error ? err.message : 'Connection failed';
       updateMessage(queueItem.userMessageId, { status: 'error' });
       error.value = err instanceof Error ? err.message : 'Failed to send message';
 
@@ -328,6 +476,10 @@ export const useChatStore = defineStore('chat', () => {
     activeConversationId.value = conversationId || null;
     // Clear target service when switching contacts
     targetService.value = null;
+
+    if (contactId === 'openclaw') {
+      refreshOpenClawStatus();
+    }
   }
 
   function setTargetService(serviceId: string | null) {
@@ -343,6 +495,8 @@ export const useChatStore = defineStore('chat', () => {
     error,
     processingStatus,
     targetService,
+    openclawStatus,
+    openclawStatusDetail,
     canSend,
     createConversation,
     addMessage,
@@ -350,5 +504,6 @@ export const useChatStore = defineStore('chat', () => {
     clearConversation,
     setActiveContact,
     setTargetService,
+    refreshOpenClawStatus,
   };
 });

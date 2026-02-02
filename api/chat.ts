@@ -114,7 +114,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Authenticate
   const authResult = authenticateRequest(
     req.headers.authorization,
-    requestId
+    requestId,
+    req.headers.cookie as string | undefined
   );
   if (!authResult.success || !authResult.context) {
     res.status(401).json({

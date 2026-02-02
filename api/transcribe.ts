@@ -181,7 +181,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   // Authenticate
-  const authResult = authenticateRequest(req.headers.authorization, requestId);
+  const authResult = authenticateRequest(
+    req.headers.authorization,
+    requestId,
+    req.headers.cookie as string | undefined
+  );
   if (!authResult.success || !authResult.context) {
     res.status(401).json({
       error: 'Unauthorized',

@@ -33,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     yukieUserIdHeader: req.headers['x-yukie-user-id'] as string,
     yukieScopesHeader: req.headers['x-yukie-scopes'] as string,
     yukieRequestIdHeader: req.headers['x-yukie-request-id'] as string,
+    cookieHeader: req.headers.cookie as string,
   });
 
   if (!authResult.success || !authResult.context) {

@@ -92,12 +92,33 @@ export function validateToken(token: string): { valid: boolean; payload?: JWTPay
 // Request Authentication
 // ============================================================================
 
-export function authenticateRequest(authHeader?: string, requestId?: string): AuthResult {
-  if (!authHeader?.startsWith('Bearer ')) {
-    return { success: false, error: 'No bearer token provided' };
+function parseCookieHeader(cookieHeader?: string): Record<string, string> {
+  if (!cookieHeader) return {};
+  return cookieHeader.split(';').reduce<Record<string, string>>((acc, part) => {
+    const [key, ...rest] = part.trim().split('=');
+    if (!key) return acc;
+    acc[key] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+}
+
+function extractBearer(authHeader?: string): string | null {
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  return authHeader.slice(7);
+}
+
+export function authenticateRequest(
+  authHeader?: string,
+  requestId?: string,
+  cookieHeader?: string
+): AuthResult {
+  const bearer = extractBearer(authHeader);
+  const cookies = parseCookieHeader(cookieHeader);
+  const token = bearer || cookies.yukie_session;
+  if (!token) {
+    return { success: false, error: 'No authentication token provided' };
   }
 
-  const token = authHeader.slice(7);
   const result = validateToken(token);
 
   if (!result.valid || !result.payload) {

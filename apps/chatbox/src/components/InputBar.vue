@@ -27,7 +27,7 @@ const availableServices = computed(() => {
 
 // Check if we're chatting with Yukie (assistant)
 const isYukieChat = computed(() => {
-  return contactsStore.activeContact?.type === 'assistant';
+  return contactsStore.activeContact?.id === 'yukie';
 });
 
 function toggleRoutingControls() {

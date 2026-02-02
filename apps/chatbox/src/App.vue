@@ -72,10 +72,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('appinstalled', handleAppInstalled);
 });
 
+const passwordInput = ref('');
+
 async function handleLogin() {
   loginError.value = null;
   try {
-    await authStore.loginDev();
+    await authStore.login(passwordInput.value);
+    passwordInput.value = '';
   } catch (error) {
     loginError.value = error instanceof Error ? error.message : 'Failed to login';
     console.error('Login error:', error);
@@ -277,9 +280,18 @@ function handleAppInstalled() {
           <div v-if="loginError" class="login-error">
             {{ loginError }}
           </div>
-          <button class="login-button" @click="handleLogin">
-            Login with Dev Account
-          </button>
+          <div class="login-form">
+            <input
+              v-model="passwordInput"
+              type="password"
+              class="login-input"
+              placeholder="Password"
+              @keydown.enter.prevent="handleLogin"
+            />
+            <button class="login-button" @click="handleLogin">
+              Login
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -909,6 +921,28 @@ function handleAppInstalled() {
 .login-card p {
   margin: 0 0 24px;
   color: var(--muted);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.login-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  font-size: 0.95rem;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: rgba(15, 118, 110, 0.5);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
 }
 
 .login-error {
