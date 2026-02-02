@@ -184,7 +184,6 @@ export const useChatStore = defineStore('chat', () => {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
-          'workstyle': 'Workstyle',
           'ideas-log': 'Ideas Log',
         };
         processingStatus.value = {
@@ -213,7 +212,7 @@ export const useChatStore = defineStore('chat', () => {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
-          'workstyle': 'Workstyle',
+          'ideas-log': 'Ideas Log',
         };
         const serviceName =
           serviceNameMap[response.routingDetails.targetService] ||
