@@ -230,7 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     runId = result?.runId;
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('OpenClaw response timeout')), 60_000);
+      const timeout = setTimeout(() => reject(new Error('OpenClaw response timeout')), 120_000);
       const onMessage = (data: WebSocket.RawData) => {
         let parsed: RpcFrame;
         try {
