@@ -48,13 +48,13 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Map<string, Conversation>>(new Map());
   const activeConversationId = ref<string | null>(null);
   const conversationByContactId = ref<Map<string, string>>(new Map());
-  const isLoading = ref(false);
+  const loadingContactIds = ref<Set<string>>(new Set());
   const error = ref<string | null>(null);
-  const processingStatus = ref<{
+  const processingStatusByContactId = ref<Map<string, {
     stage: 'routing' | 'fetching-actions' | 'invoking' | null;
     service?: string;
     action?: string;
-  } | null>(null);
+  }>>(new Map());
   const openclawActiveMessageId = ref<string | null>(null);
   const openclawLastTextByMessageId = ref<Record<string, string>>({});
   const openclawStatus = ref<'online' | 'offline' | 'connecting' | 'not_configured'>('offline');
@@ -85,6 +85,23 @@ export const useChatStore = defineStore('chat', () => {
 
   const messages = computed(() => {
     return activeConversation.value?.messages || [];
+  });
+
+  // Per-contact loading state - only shows loading for the currently active contact
+  const isActiveContactLoading = computed(() => {
+    const activeId = contactsStore.activeContactId;
+    if (!activeId) return false;
+    return loadingContactIds.value.has(activeId);
+  });
+
+  // Global loading state - backwards compatibility (true if any contact is loading)
+  const isLoading = computed(() => loadingContactIds.value.size > 0);
+
+  // Processing status for the active contact
+  const processingStatus = computed(() => {
+    const activeId = contactsStore.activeContactId;
+    if (!activeId) return null;
+    return processingStatusByContactId.value.get(activeId) || null;
   });
 
   function generateId(): string {
@@ -201,21 +218,27 @@ export const useChatStore = defineStore('chat', () => {
     userMessageId: string;
     createdAt: Date;
   }) {
-    processingStatus.value = queueItem.targetService
-      ? { stage: 'fetching-actions', service: queueItem.targetService }
-      : { stage: 'routing' };
+    // Set loading state for this specific contact
+    loadingContactIds.value.add(queueItem.contactId);
+    processingStatusByContactId.value.set(
+      queueItem.contactId,
+      queueItem.targetService
+        ? { stage: 'fetching-actions', service: queueItem.targetService }
+        : { stage: 'routing' }
+    );
 
     const progressInterval = setInterval(() => {
-      if (!isLoading.value) {
+      if (!loadingContactIds.value.has(queueItem.contactId)) {
         clearInterval(progressInterval);
         return;
       }
 
+      const currentStatus = processingStatusByContactId.value.get(queueItem.contactId);
       const elapsed = Date.now() - queueItem.createdAt.getTime();
-      if (elapsed > 2000 && processingStatus.value?.stage === 'routing') {
-        processingStatus.value = { stage: 'fetching-actions', service: 'service' };
-      } else if (elapsed > 3000 && processingStatus.value?.stage === 'fetching-actions') {
-        processingStatus.value = { stage: 'invoking', service: 'service' };
+      if (elapsed > 2000 && currentStatus?.stage === 'routing') {
+        processingStatusByContactId.value.set(queueItem.contactId, { stage: 'fetching-actions', service: 'service' });
+      } else if (elapsed > 3000 && currentStatus?.stage === 'fetching-actions') {
+        processingStatusByContactId.value.set(queueItem.contactId, { stage: 'invoking', service: 'service' });
       }
     }, 500);
 
@@ -281,11 +304,11 @@ export const useChatStore = defineStore('chat', () => {
             }
           });
 
-          processingStatus.value = { stage: 'invoking', service: 'OpenClaw' };
+          processingStatusByContactId.value.set(queueItem.contactId, { stage: 'invoking', service: 'OpenClaw' });
           await openclawSendMessage(config, queueItem.content, 'main');
           openclawStatus.value = 'online';
         } else {
-          processingStatus.value = { stage: 'invoking', service: 'OpenClaw' };
+          processingStatusByContactId.value.set(queueItem.contactId, { stage: 'invoking', service: 'OpenClaw' });
           const proxyResponse = await openclawSendMessageProxy(authStore.token, queueItem.content, 'main');
           addMessage(
             {
@@ -320,11 +343,11 @@ export const useChatStore = defineStore('chat', () => {
           'workstyle': 'Workstyle',
           'ideas-log': 'Ideas Log',
         };
-        processingStatus.value = {
+        processingStatusByContactId.value.set(queueItem.contactId, {
           stage: 'invoking',
           service: serviceNameMap[response.serviceUsed] || response.serviceUsed,
           action: response.actionInvoked,
-        };
+        });
       }
 
       updateMessage(queueItem.userMessageId, { status: 'sent' });
@@ -395,16 +418,16 @@ export const useChatStore = defineStore('chat', () => {
     if (isProcessingQueue.value) return;
 
     isProcessingQueue.value = true;
-    isLoading.value = true;
 
     while (messageQueue.value.length > 0) {
       const nextItem = messageQueue.value[0];
       await processQueuedMessage(nextItem);
+      // Clear loading state for this contact after processing
+      loadingContactIds.value.delete(nextItem.contactId);
+      processingStatusByContactId.value.delete(nextItem.contactId);
       messageQueue.value.shift();
     }
 
-    isLoading.value = false;
-    processingStatus.value = null;
     isProcessingQueue.value = false;
   }
 
@@ -459,7 +482,9 @@ export const useChatStore = defineStore('chat', () => {
     }
     activeConversationId.value = null;
     error.value = null;
-    processingStatus.value = null;
+    // Clear loading state for this contact
+    loadingContactIds.value.delete(activeContact.id);
+    processingStatusByContactId.value.delete(activeContact.id);
   }
 
   function setActiveContact(contactId: string) {
@@ -484,6 +509,7 @@ export const useChatStore = defineStore('chat', () => {
     activeConversation,
     messages,
     isLoading,
+    isActiveContactLoading,
     error,
     processingStatus,
     targetService,

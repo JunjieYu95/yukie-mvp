@@ -159,7 +159,7 @@ function openclawStatusLabel() {
         </ul>
       </div>
 
-      <div v-if="chatStore.isLoading" class="loading-indicator">
+      <div v-if="chatStore.isActiveContactLoading" class="loading-indicator">
         <div class="loading-content">
           <div class="loading-dots">
             <span class="loading-dot"></span>
