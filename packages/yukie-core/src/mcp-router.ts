@@ -103,13 +103,19 @@ export async function routeToTool(
     })
     .join('\n');
 
+  // When targeting a specific service, use a stricter prompt that constrains
+  // the LLM to only select from the available tools (container isolation).
+  const isolationClause = targetService
+    ? `\n\nIMPORTANT: You MUST select one of the available tools listed above. These are the ONLY tools you can use. Do NOT suggest or reference any other service or tool.`
+    : '';
+
   const prompt = `You are a tool selector for an AI assistant. Given a user message and available tools, determine which tool to use.
 
 Available tools:
 ${toolsDescription}
 
 User message: "${userMessage}"
-
+${isolationClause}
 Respond ONLY with valid JSON in this format:
 {
   "tool": "<tool-name>",
@@ -165,11 +171,28 @@ If no tool is appropriate, respond with:
     // Find the selected tool
     const selected = allTools.find((t) => t.tool.name === result.tool);
 
+    // HARD GUARD: If targetService is set, verify the selected tool belongs to it.
+    // This prevents any LLM hallucination from breaking container isolation.
+    if (targetService && selected && selected.serviceId !== targetService) {
+      logger.warn('Container isolation violation prevented: LLM selected tool from wrong service', {
+        targetService,
+        selectedTool: result.tool,
+        selectedService: selected.serviceId,
+        userMessage: userMessage.substring(0, 100),
+      });
+      return {
+        selectedTool: null,
+        confidence: 0,
+        reasoning: `Tool '${result.tool}' does not belong to the target service '${targetService}'. Container isolation enforced.`,
+      };
+    }
+
     logger.info('Tool routing complete', {
       selectedTool: result.tool,
       service: result.service,
       confidence: result.confidence,
       durationMs: timing.durationMs,
+      targetService: targetService || 'auto',
     });
 
     return {
@@ -404,7 +427,8 @@ export async function formatResponse(
   originalRequest: string,
   toolResult: MCPToolsCallResult,
   serviceName: string,
-  model?: string
+  model?: string,
+  isDirectServiceChat?: boolean
 ): Promise<string> {
   try {
     const client = getLLMClient();
@@ -416,7 +440,7 @@ export async function formatResponse(
       .join('\n');
 
     const resultData = toolResult.structuredContent || textContent;
-    const prompt = buildResponseFormattingPrompt(originalRequest, resultData, serviceName);
+    const prompt = buildResponseFormattingPrompt(originalRequest, resultData, serviceName, isDirectServiceChat);
 
     const result = await client.complete([{ role: 'user', content: prompt }], {
       temperature: 0.7,
@@ -469,6 +493,55 @@ export async function generateFallbackResponse(userMessage: string, model?: stri
     logger.error('Fallback response generation failed', error);
 
     return classifyAndFormatLLMError(errorMessage);
+  }
+}
+
+// ============================================================================
+// Service-Scoped Fallback (Container Isolation)
+// ============================================================================
+
+/**
+ * Generate a fallback response scoped to a specific service.
+ * Used when chatting directly with a service contact and no tool matches.
+ * This prevents cross-service leakage by never mentioning other services.
+ */
+export async function generateServiceScopedFallback(
+  userMessage: string,
+  serviceId: string,
+  serviceName: string,
+  model?: string
+): Promise<string> {
+  // Build a list of capabilities for this specific service
+  const registry = getMCPRegistry();
+  const service = registry.get(serviceId);
+  const capabilities = service?.capabilities?.join(', ') || 'unknown';
+
+  try {
+    const client = getLLMClient();
+    const systemPrompt = `You are ${serviceName}, a specialized assistant. You can ONLY help with: ${capabilities}.
+
+IMPORTANT RULES:
+- You must NEVER suggest, mention, or reference any other service or assistant.
+- If the user's request is outside your capabilities, politely explain what you CAN do and ask them to rephrase.
+- Stay in character as ${serviceName} only.
+- Keep responses concise and helpful.`;
+
+    const result = await client.complete(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      {
+        temperature: 0.7,
+        maxTokens: 512,
+        model,
+      }
+    );
+
+    return result.content;
+  } catch (err) {
+    logger.error('Service-scoped fallback generation failed', err, { serviceId });
+    return `I'm ${serviceName} and I can help with: ${capabilities}. Could you rephrase your request so I can assist you?`;
   }
 }
 
@@ -971,17 +1044,31 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
         reasoning: routing.reasoning,
       });
       response = classifyAndFormatLLMError(routing.reasoning);
+    } else if (targetService) {
+      // CONTAINER ISOLATION: When chatting directly with a service contact,
+      // do NOT fall back to generic Yukie routing. Generate a response scoped
+      // to this service only. This prevents cross-service leakage.
+      const registry = getMCPRegistry();
+      const service = registry.get(targetService);
+      const serviceName = service?.name || targetService;
+      logger.info('No tool matched within isolated service, using scoped fallback', {
+        targetService,
+        reasoning: routing.reasoning,
+      });
+      response = await generateServiceScopedFallback(message, targetService, serviceName, model);
     } else {
-      // Routing worked but no tool matched - use LLM for a conversational response
+      // No targetService set (Yukie manager mode) - use generic LLM fallback
+      // that can suggest any service. Only Yukie can route between services.
       response = await generateFallbackResponse(message, model);
     }
 
     return {
       response,
+      serviceUsed: targetService || undefined,
       routingConfidence: routing.confidence,
       routingDetails: {
         tool: 'none',
-        service: 'none',
+        service: targetService || 'none',
         confidence: routing.confidence,
         reasoning: routing.reasoning,
       },
@@ -990,17 +1077,40 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
 
   const { tool, serviceId, serviceName } = routing.selectedTool;
 
+  // CONTAINER ISOLATION GUARD: If targetService is specified, verify the
+  // routed service matches. This is a defense-in-depth check - routeToTool
+  // already filters, but this ensures no path can bypass isolation.
+  if (targetService && serviceId !== targetService) {
+    logger.error('Container isolation violation: routed to wrong service', {
+      targetService,
+      routedService: serviceId,
+      tool: tool.name,
+      message: message.substring(0, 100),
+    });
+    return {
+      response: `I can only use ${serviceName}'s capabilities in this conversation. If you need other services, please chat with Yukie directly.`,
+      serviceUsed: targetService,
+      routingConfidence: 0,
+      routingDetails: {
+        tool: 'none',
+        service: targetService,
+        confidence: 0,
+        reasoning: `Container isolation enforced: cannot route to '${serviceId}' when targeting '${targetService}'.`,
+      },
+    };
+  }
+
   // Step 3: Extract parameters for the tool
   const toolCall = await selectToolParameters(message, tool, model, auth.utcOffsetMinutes);
 
   if (!toolCall) {
     // Parameter extraction failed - provide a helpful message instead of generic fallback
-    logger.warn('Parameter extraction failed, providing helpful error', { 
-      toolName: tool.name, 
-      serviceId, 
+    logger.warn('Parameter extraction failed, providing helpful error', {
+      toolName: tool.name,
+      serviceId,
       message: message.substring(0, 100),
     });
-    
+
     // Generate a helpful error message specific to the tool
     let response: string;
     if (tool.name === 'diary.log') {
@@ -1008,7 +1118,7 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
     } else {
       response = `I understood your request should go to ${serviceName}, but I had trouble parsing the details. Could you try rephrasing your request more clearly?`;
     }
-    
+
     return {
       response,
       serviceUsed: serviceId,
@@ -1067,7 +1177,7 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
         (c) => !(c.type === 'text' && c.mimeType === 'text/markdown')
       ),
     };
-    response = await formatResponse(message, filteredForFormat, serviceName, model);
+    response = await formatResponse(message, filteredForFormat, serviceName, model, !!targetService);
   }
 
   // Extract rich content (images, etc.) from tool result
