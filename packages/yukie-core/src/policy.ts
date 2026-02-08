@@ -32,26 +32,27 @@ export function canAccessService(auth: AuthContext, serviceId: string): PolicyCh
   const service = registry.get(serviceId);
 
   if (!service) {
+    const available = registry.getAll().map(s => s.id).join(', ');
     return {
       allowed: false,
-      reason: `Service ${serviceId} not found`,
+      reason: `Service '${serviceId}' not found in registry. Available services: [${available || 'none'}]`,
     };
   }
 
   if (!service.enabled) {
     return {
       allowed: false,
-      reason: `Service ${serviceId} is currently disabled`,
+      reason: `Service '${serviceId}' (${service.name}) is currently disabled by configuration`,
     };
   }
 
   // Check if user has at least one required scope for the service
-  const hasRequiredScope = service.scopes.some((scope) => auth.scopes.includes(scope));
+  const hasRequiredScope = service.scopes.length === 0 || service.scopes.some((scope) => auth.scopes.includes(scope));
 
   if (!hasRequiredScope) {
     return {
       allowed: false,
-      reason: 'Insufficient permissions to access this service',
+      reason: `Insufficient permissions to access service '${serviceId}' (${service.name}). Required scopes (need at least one): [${service.scopes.join(', ')}]. Your scopes: [${auth.scopes.join(', ')}]`,
       missingScopes: service.scopes,
     };
   }
@@ -165,12 +166,21 @@ export function checkRateLimit(
 
   if (entry.count >= effectiveConfig.maxRequests) {
     const resetAt = entry.windowStart + effectiveConfig.windowMs;
-    logger.warn('Rate limit exceeded', { userId, operation, resetAt });
+    const resetDate = new Date(resetAt);
+    const waitSeconds = Math.ceil((resetAt - now) / 1000);
+    logger.warn('Rate limit exceeded', {
+      userId,
+      operation,
+      resetAt,
+      maxRequests: effectiveConfig.maxRequests,
+      windowMs: effectiveConfig.windowMs,
+      waitSeconds,
+    });
     return {
       allowed: false,
       remaining: 0,
       resetAt,
-      reason: 'Rate limit exceeded. Please try again later.',
+      reason: `Rate limit exceeded for '${operation}': ${effectiveConfig.maxRequests} requests per ${Math.round(effectiveConfig.windowMs / 1000)}s window. Please wait ${waitSeconds}s (resets at ${resetDate.toISOString()}).`,
     };
   }
 

@@ -107,7 +107,12 @@ class MCPServiceRegistry {
   async connectMCP(serviceId: string, context?: InvokeContext): Promise<MCPConnectionState> {
     const service = this.get(serviceId);
     if (!service) {
-      return { connected: false, initialized: false, error: 'Service not found' };
+      const availableServices = this.getAll().map(s => s.id).join(', ');
+      return {
+        connected: false,
+        initialized: false,
+        error: `Service '${serviceId}' not found in registry. Available services: [${availableServices || 'none'}]`,
+      };
     }
 
     try {
@@ -136,10 +141,13 @@ class MCPServiceRegistry {
       this.connectionState.set(serviceId, state);
       return state;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const endpoint = this.getMCPEndpoint(service);
+      logger.error('MCP connection failed', error, { serviceId, endpoint });
       const state: MCPConnectionState = {
         connected: false,
         initialized: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: `Failed to connect to MCP service '${service.name}' (${serviceId}) at ${endpoint}: ${errorMessage}`,
       };
       this.connectionState.set(serviceId, state);
       return state;
@@ -157,6 +165,7 @@ class MCPServiceRegistry {
   async fetchTools(serviceId: string, context?: InvokeContext): Promise<MCPTool[]> {
     const service = this.get(serviceId);
     if (!service) {
+      logger.warn('Cannot fetch tools: service not found', { serviceId });
       return [];
     }
 
@@ -179,7 +188,14 @@ class MCPServiceRegistry {
 
       return tools;
     } catch (error) {
-      logger.error('Error fetching tools', error, { serviceId });
+      const endpoint = this.getMCPEndpoint(service);
+      logger.error('Failed to fetch tools from MCP service', error, {
+        serviceId,
+        serviceName: service.name,
+        endpoint,
+        hasCachedTools: !!service.tools,
+        cachedToolCount: service.tools?.length || 0,
+      });
       return service.tools || [];
     }
   }
@@ -196,8 +212,9 @@ class MCPServiceRegistry {
   ): Promise<MCPToolsCallResult> {
     const service = this.get(serviceId);
     if (!service) {
+      const availableServices = this.getAll().map(s => `${s.id} (${s.name})`).join(', ');
       return {
-        content: [{ type: 'text', text: 'Service not found' }],
+        content: [{ type: 'text', text: `Service '${serviceId}' not found. Available services: [${availableServices || 'none'}]` }],
         isError: true,
       };
     }
@@ -212,9 +229,10 @@ class MCPServiceRegistry {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error('Tool invocation failed', error, { serviceId, toolName });
+      const endpoint = this.getMCPEndpoint(service);
+      logger.error('Tool invocation failed', error, { serviceId, serviceName: service.name, toolName, endpoint });
       return {
-        content: [{ type: 'text', text: `Error: ${message}` }],
+        content: [{ type: 'text', text: `Failed to invoke tool '${toolName}' on service '${service.name}' (${serviceId}): ${message}` }],
         isError: true,
       };
     }
@@ -227,6 +245,7 @@ class MCPServiceRegistry {
   async checkHealth(serviceId: string): Promise<HealthResponse> {
     const service = this.get(serviceId);
     if (!service) {
+      logger.warn('Cannot check health: service not found', { serviceId });
       return { ok: false };
     }
 
@@ -248,7 +267,12 @@ class MCPServiceRegistry {
       this.healthStatus.set(serviceId, { ok, lastCheck: Date.now() });
 
       if (!ok) {
-        logger.warn('Service health check failed', { serviceId, status: response.status });
+        logger.warn('Service health check failed', {
+          serviceId,
+          serviceName: service.name,
+          healthEndpoint: `${service.baseUrl}${service.healthEndpoint}`,
+          status: response.status,
+        });
       }
 
       try {
@@ -258,7 +282,11 @@ class MCPServiceRegistry {
       }
     } catch (error) {
       this.healthStatus.set(serviceId, { ok: false, lastCheck: Date.now() });
-      logger.error('Service health check error', error, { serviceId });
+      logger.error('Service health check error', error, {
+        serviceId,
+        serviceName: service.name,
+        baseUrl: service.baseUrl,
+      });
       return { ok: false, service: serviceId };
     }
   }
@@ -334,16 +362,31 @@ class MCPServiceRegistry {
     });
 
     if (!response.ok) {
-      throw new Error(`MCP request failed: ${response.status} ${response.statusText}`);
+      let body = '';
+      try { body = await response.text(); } catch { /* ignore */ }
+      throw new Error(`MCP request to ${endpoint} failed with HTTP ${response.status} (${response.statusText}). Method: '${method}'. Response body: ${body.substring(0, 200)}`);
     }
 
-    const jsonRpcResponse = await response.json() as {
-      result?: T;
-      error?: { code: number; message: string };
-    };
+    let jsonRpcResponse: { result?: T; error?: { code: number; message: string; data?: unknown } };
+    try {
+      jsonRpcResponse = await response.json() as typeof jsonRpcResponse;
+    } catch (parseError) {
+      throw new Error(`MCP service at ${endpoint} returned invalid JSON for method '${method}'. The service may be misconfigured or returning non-JSON content.`);
+    }
 
     if (jsonRpcResponse.error) {
-      throw new Error(jsonRpcResponse.error.message || 'MCP request failed');
+      const code = jsonRpcResponse.error.code;
+      const codeLabel =
+        code === -32700 ? 'Parse Error' :
+        code === -32600 ? 'Invalid Request' :
+        code === -32601 ? 'Method Not Found' :
+        code === -32602 ? 'Invalid Params' :
+        code === -32603 ? 'Internal Error' :
+        code === -32002 ? 'Resource Not Found' :
+        code === -32003 ? 'Tool Not Found' :
+        code === -32004 ? 'Prompt Not Found' :
+        `Code ${code}`;
+      throw new Error(`MCP ${codeLabel} from ${endpoint} for method '${method}': ${jsonRpcResponse.error.message}`);
     }
 
     return jsonRpcResponse.result as T;

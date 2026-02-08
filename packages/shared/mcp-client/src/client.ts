@@ -112,10 +112,11 @@ export class MCPClient {
 
       return this.state;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.state = {
         connected: false,
         initialized: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: `Failed to connect to MCP service at ${this.config.baseUrl}: ${errorMessage}`,
       };
       throw error;
     }
@@ -303,15 +304,22 @@ export class MCPClient {
         );
 
         if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+          const statusMessage = this.describeHTTPError(response.status, response.statusText);
+          throw new Error(`MCP service HTTP error (${response.status}): ${statusMessage} [URL: ${this.config.baseUrl}, method: ${method}]`);
         }
 
-        const jsonRpcResponse: MCPJsonRpcResponse = await response.json();
+        let jsonRpcResponse: MCPJsonRpcResponse;
+        try {
+          jsonRpcResponse = await response.json();
+        } catch (parseError) {
+          throw new Error(`MCP service returned invalid JSON response for method '${method}'. The service at ${this.config.baseUrl} may be misconfigured or returning HTML instead of JSON-RPC.`);
+        }
 
         if (jsonRpcResponse.error) {
+          const codeDesc = this.describeJsonRpcError(jsonRpcResponse.error.code);
           throw new MCPClientError(
             jsonRpcResponse.error.code,
-            jsonRpcResponse.error.message,
+            `MCP error [${codeDesc}]: ${jsonRpcResponse.error.message} [method: ${method}]`,
             jsonRpcResponse.error.data
           );
         }
@@ -320,9 +328,19 @@ export class MCPClient {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Don't retry on client errors (4xx)
+        // Don't retry on client errors (MCP protocol errors)
         if (error instanceof MCPClientError) {
           throw error;
+        }
+
+        // Enhance timeout/abort errors
+        if (error instanceof Error && error.name === 'AbortError') {
+          lastError = new Error(`MCP request timed out after ${this.config.timeout}ms for method '${method}' at ${this.config.baseUrl}. The service may be unresponsive or overloaded.`);
+        }
+
+        // Enhance network errors
+        if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed'))) {
+          lastError = new Error(`Cannot reach MCP service at ${this.config.baseUrl} for method '${method}'. The service may be down, the URL may be wrong, or there's a network issue. Original error: ${error.message}`);
         }
 
         // Wait before retrying
@@ -332,7 +350,7 @@ export class MCPClient {
       }
     }
 
-    throw lastError || new Error('Request failed after retries');
+    throw new Error(`MCP request failed after ${retryCount} attempts for method '${method}' at ${this.config.baseUrl}. Last error: ${lastError?.message || 'Unknown error'}`);
   }
 
   private async fetchWithTimeout(
@@ -356,6 +374,37 @@ export class MCPClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private describeHTTPError(status: number, statusText: string): string {
+    switch (status) {
+      case 400: return `Bad request - the MCP request format was rejected by the service`;
+      case 401: return `Authentication failed - the service requires valid credentials`;
+      case 403: return `Access forbidden - insufficient permissions to access this service`;
+      case 404: return `MCP endpoint not found - the service URL may be incorrect or the /api/mcp endpoint is not configured`;
+      case 405: return `Method not allowed - the service does not accept POST requests at this endpoint`;
+      case 408: return `Request timeout - the service took too long to respond`;
+      case 429: return `Rate limited - too many requests sent to this service`;
+      case 500: return `Internal server error - the service encountered an unexpected error`;
+      case 502: return `Bad gateway - the service is unreachable through the proxy/gateway`;
+      case 503: return `Service unavailable - the service is temporarily down or overloaded`;
+      case 504: return `Gateway timeout - the service did not respond in time`;
+      default: return statusText || `Unexpected error`;
+    }
+  }
+
+  private describeJsonRpcError(code: number): string {
+    switch (code) {
+      case -32700: return 'Parse Error - invalid JSON was received';
+      case -32600: return 'Invalid Request - the JSON-RPC request structure is invalid';
+      case -32601: return 'Method Not Found - the requested MCP method does not exist';
+      case -32602: return 'Invalid Params - the parameters provided are invalid';
+      case -32603: return 'Internal Error - the MCP server encountered an internal error';
+      case -32002: return 'Resource Not Found';
+      case -32003: return 'Tool Not Found';
+      case -32004: return 'Prompt Not Found';
+      default: return `Error Code ${code}`;
+    }
   }
 
   // ============================================================================

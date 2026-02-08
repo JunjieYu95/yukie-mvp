@@ -38,7 +38,7 @@ async function fetchRecords(from?: string, to?: string): Promise<ExternalRecord[
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch records: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch habit records from ${EARLY_WAKEUP_API_URL}: HTTP ${response.status} ${response.statusText}. The habit tracking service may be temporarily unavailable.`);
   }
 
   const data = (await response.json()) as ExternalRecordsResponse;
@@ -53,7 +53,7 @@ async function fetchRecord(date: string): Promise<ExternalRecord | null> {
     if (response.status === 404) {
       return null;
     }
-    throw new Error(`Failed to fetch record: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch habit record for date '${date}' from ${EARLY_WAKEUP_API_URL}: HTTP ${response.status} ${response.statusText}`);
   }
 
   const data = (await response.json()) as ExternalRecordResponse;
@@ -73,7 +73,7 @@ async function createOrUpdateRecord(date: string, checked: boolean, note?: strin
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create/update record: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to save habit record for date '${date}' to ${EARLY_WAKEUP_API_URL}: HTTP ${response.status} ${response.statusText}`);
   }
 }
 
@@ -90,7 +90,7 @@ async function updateRecord(date: string, checked?: boolean, note?: string): Pro
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update record: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to update habit record for date '${date}' at ${EARLY_WAKEUP_API_URL}: HTTP ${response.status} ${response.statusText}`);
   }
 }
 
@@ -101,7 +101,7 @@ async function deleteRecord(date: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete record: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to delete habit record for date '${date}' at ${EARLY_WAKEUP_API_URL}: HTTP ${response.status} ${response.statusText}`);
   }
 }
 
@@ -164,12 +164,13 @@ async function handleCheckin(
       },
     };
   } catch (error) {
-    logger.error('Failed to record check-in', error, { userId, date });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to record check-in', error, { userId, date, apiUrl: EARLY_WAKEUP_API_URL });
     return {
       success: false,
       error: {
-        code: 'EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to record check-in',
+        code: 'CHECKIN_FAILED',
+        message: `Failed to record habit check-in for ${date}: ${errorMsg}`,
       },
     };
   }
@@ -227,12 +228,13 @@ async function handleQuery(
       },
     };
   } catch (error) {
-    logger.error('Failed to query records', error, { userId });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to query records', error, { userId, apiUrl: EARLY_WAKEUP_API_URL });
     return {
       success: false,
       error: {
-        code: 'EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to query records',
+        code: 'QUERY_FAILED',
+        message: `Failed to query habit records: ${errorMsg}`,
       },
     };
   }
@@ -333,12 +335,13 @@ async function handleStats(
       },
     };
   } catch (error) {
-    logger.error('Failed to calculate stats', error, { userId });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to calculate stats', error, { userId, month, apiUrl: EARLY_WAKEUP_API_URL });
     return {
       success: false,
       error: {
-        code: 'EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to calculate stats',
+        code: 'STATS_FAILED',
+        message: `Failed to calculate habit statistics for ${month}: ${errorMsg}`,
       },
     };
   }
@@ -385,12 +388,13 @@ async function handleDelete(
       },
     };
   } catch (error) {
-    logger.error('Failed to delete record', error, { userId, date });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Failed to delete record', error, { userId, date, apiUrl: EARLY_WAKEUP_API_URL });
     return {
       success: false,
       error: {
-        code: 'EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to delete record',
+        code: 'DELETE_FAILED',
+        message: `Failed to delete habit record for ${date}: ${errorMsg}`,
       },
     };
   }
@@ -416,11 +420,12 @@ export async function executeAction(request: YWAIPInvokeRequest): Promise<YWAIPI
   // Validate action exists
   const actionDef = getAction(action);
   if (!actionDef) {
+    const availableActions = Object.keys(actionHandlers).join(', ');
     return {
       success: false,
       error: {
         code: 'UNKNOWN_ACTION',
-        message: `Unknown action: ${action}`,
+        message: `Unknown action '${action}' on habit tracker service. Available actions: [${availableActions}]`,
       },
     };
   }
@@ -444,7 +449,7 @@ export async function executeAction(request: YWAIPInvokeRequest): Promise<YWAIPI
         success: false,
         error: {
           code: 'FORBIDDEN',
-          message: 'Insufficient permissions',
+          message: `Insufficient permissions for action '${action}'. Required scopes: [${actionDef.requiredScopes.join(', ')}]. Missing: [${scopeCheck.missingScopes?.join(', ') || ''}]`,
           details: { missingScopes: scopeCheck.missingScopes },
         },
       };
@@ -454,11 +459,12 @@ export async function executeAction(request: YWAIPInvokeRequest): Promise<YWAIPI
   // Execute action
   const handler = actionHandlers[action];
   if (!handler) {
+    const availableActions = Object.keys(actionHandlers).join(', ');
     return {
       success: false,
       error: {
         code: 'NOT_IMPLEMENTED',
-        message: `Action ${action} is not implemented`,
+        message: `Action '${action}' is defined but has no handler implementation. Available handlers: [${availableActions}]`,
       },
     };
   }
@@ -466,12 +472,13 @@ export async function executeAction(request: YWAIPInvokeRequest): Promise<YWAIPI
   try {
     return await handler(params, context);
   } catch (error) {
-    logger.error('Action execution error', error, { action });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error('Action execution error', error, { action, userId: context.userId });
     return {
       success: false,
       error: {
         code: 'EXECUTION_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
+        message: `Unexpected error executing action '${action}': ${errorMsg}`,
       },
     };
   }
