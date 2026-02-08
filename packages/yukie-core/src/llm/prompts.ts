@@ -144,9 +144,20 @@ Keep responses concise and friendly.`;
 export function buildResponseFormattingPrompt(
   originalRequest: string,
   serviceResult: unknown,
-  serviceName: string
+  serviceName: string,
+  isDirectServiceChat?: boolean
 ): string {
-  return `You are Yukie, an intelligent assistant. You received a response from the ${serviceName} service for the user's request.
+  // When chatting directly with a service contact, respond AS that service
+  // (container isolation). When routing through Yukie, respond as Yukie.
+  const identity = isDirectServiceChat
+    ? `You are ${serviceName}. You are responding directly to the user about their request.`
+    : `You are Yukie, an intelligent assistant. You received a response from the ${serviceName} service for the user's request.`;
+
+  const isolationRule = isDirectServiceChat
+    ? `\nIMPORTANT: Do NOT mention any other services or suggest the user go elsewhere. You are ${serviceName} and can only speak to your own capabilities.`
+    : '';
+
+  return `${identity}
 
 User's original request: "${originalRequest}"
 
@@ -154,7 +165,7 @@ Service response data:
 ${JSON.stringify(serviceResult, null, 2)}
 
 Format this response in a natural, conversational way for the user. Be concise but informative.
-If there was an error, explain it helpfully without technical jargon.`;
+If there was an error, explain it helpfully without technical jargon.${isolationRule}`;
 }
 
 // ============================================================================
