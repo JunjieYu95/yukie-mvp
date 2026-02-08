@@ -65,26 +65,28 @@ export function validateToken(token: string): { valid: boolean; payload?: JWTPay
     const parts = token.split('.');
 
     if (parts.length !== 3) {
-      return { valid: false, error: 'Invalid token format' };
+      return { valid: false, error: 'Invalid token format: Expected JWT with 3 parts (header.payload.signature)' };
     }
 
     const [headerEncoded, payloadEncoded, signature] = parts;
     const message = `${headerEncoded}.${payloadEncoded}`;
 
     if (!hmacVerify(message, signature, secret)) {
-      return { valid: false, error: 'Invalid signature' };
+      return { valid: false, error: 'Invalid token signature: The token may have been tampered with or the JWT_SECRET has changed' };
     }
 
     const payload = JSON.parse(base64UrlDecode(payloadEncoded)) as JWTPayload;
 
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp < now) {
-      return { valid: false, error: 'Token expired' };
+      const expiredAgo = now - payload.exp;
+      return { valid: false, error: `Token expired ${expiredAgo}s ago. Please log in again to get a new token.` };
     }
 
     return { valid: true, payload };
   } catch (error) {
-    return { valid: false, error: `Token validation failed: ${error}` };
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { valid: false, error: `Token validation failed: ${errorMsg}` };
   }
 }
 
@@ -116,7 +118,7 @@ export function authenticateRequest(
   const cookies = parseCookieHeader(cookieHeader);
   const token = bearer || cookies.yukie_session;
   if (!token) {
-    return { success: false, error: 'No authentication token provided' };
+    return { success: false, error: 'No authentication token provided. Send a Bearer token in the Authorization header or set the yukie_session cookie.' };
   }
 
   const result = validateToken(token);

@@ -60,9 +60,18 @@ export class Planner {
       const timing = timer();
 
       if (!result || error) {
-        logger.warn('Failed to generate plan', { error });
+        const errorDetail = error || 'LLM did not return a valid plan';
+        logger.warn('Failed to generate plan', {
+          error: errorDetail,
+          toolCount: request.availableTools.reduce((sum, s) => sum + s.tools.length, 0),
+          serviceCount: request.availableTools.length,
+          messagePreview: request.message.substring(0, 100),
+        });
         return {
-          plan: this.createEmptyPlan(request.message, 'Failed to generate plan'),
+          plan: this.createEmptyPlan(
+            request.message,
+            `Failed to generate execution plan: ${errorDetail}. The AI could not determine the right tools for this request.`
+          ),
           planningTimeMs: timing.durationMs,
         };
       }
@@ -73,7 +82,14 @@ export class Planner {
       // Validate the plan
       const validation = this.validatePlan(plan, request.auth, request.availableTools);
       if (!validation.valid) {
-        logger.warn('Plan validation failed', { errors: validation.errors });
+        const errorSummary = validation.errors.map(e => `[${e.type}] ${e.message}`).join('; ');
+        logger.warn('Plan validation failed', {
+          planId: plan.id,
+          errorCount: validation.errors.length,
+          warningCount: validation.warnings.length,
+          errors: validation.errors,
+          errorSummary,
+        });
         // Still return the plan, but log the issues
       }
 
@@ -91,9 +107,25 @@ export class Planner {
       };
     } catch (error) {
       const timing = timer();
-      logger.error('Planning error', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Planning error', error, {
+        messagePreview: request.message.substring(0, 100),
+        serviceCount: request.availableTools.length,
+      });
+
+      let reason: string;
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        reason = 'Planning failed: LLM rate limit exceeded. Please wait and try again.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        reason = 'Planning failed: LLM request timed out. The request may be too complex.';
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('API key')) {
+        reason = 'Planning failed: LLM API authentication error. Check API key configuration.';
+      } else {
+        reason = `Planning failed: ${errorMessage}`;
+      }
+
       return {
-        plan: this.createEmptyPlan(request.message, 'Planning failed due to an error'),
+        plan: this.createEmptyPlan(request.message, reason),
         planningTimeMs: timing.durationMs,
       };
     }

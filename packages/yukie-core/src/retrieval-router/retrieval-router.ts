@@ -78,10 +78,12 @@ export class RetrievalRouter {
 
     // Step 2: If no candidates, return early
     if (retrieval.candidates.length === 0) {
+      const registry = getEnhancedRegistry();
+      const enabledCount = registry.getEnabled().length;
       return {
         targetService: 'none',
         confidence: 1.0,
-        reasoning: 'No matching services found for this request',
+        reasoning: `No matching services found for this request. Searched ${enabledCount} enabled service(s) but none matched the keywords extracted from your message. Try rephrasing your request.`,
         candidates: [],
         retrievalTime: retrievalTime.durationMs,
         routingTime: 0,
@@ -279,11 +281,15 @@ export class RetrievalRouter {
       );
 
       if (!result || error) {
-        logger.warn('Failed to parse routing result', { error });
+        logger.warn('Failed to parse routing result', {
+          error,
+          candidateCount: candidates.length,
+          messagePreview: message.substring(0, 100),
+        });
         return {
           targetService: 'none',
           confidence: 0,
-          reasoning: 'Failed to determine routing',
+          reasoning: `Routing decision failed: LLM did not return a valid routing response. ${error || 'No result received.'} Checked ${candidates.length} candidate service(s).`,
         };
       }
 
@@ -293,11 +299,27 @@ export class RetrievalRouter {
         reasoning: result.reasoning,
       };
     } catch (error) {
-      logger.error('LLM routing error', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('LLM routing error', error, {
+        candidateCount: candidates.length,
+        messagePreview: message.substring(0, 100),
+      });
+
+      let reasoning: string;
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        reasoning = 'Routing failed: LLM rate limit exceeded. The AI service is temporarily overloaded.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+        reasoning = 'Routing failed: LLM request timed out while selecting a service.';
+      } else if (errorMessage.includes('API key') || errorMessage.includes('authentication')) {
+        reasoning = 'Routing failed: LLM API authentication error. The AI service credentials may be misconfigured.';
+      } else {
+        reasoning = `Routing failed: ${errorMessage}`;
+      }
+
       return {
         targetService: 'none',
         confidence: 0,
-        reasoning: 'Routing failed due to an error',
+        reasoning,
       };
     }
   }

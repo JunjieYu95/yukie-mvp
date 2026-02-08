@@ -55,6 +55,39 @@ class AnthropicClient implements LLMClient {
     return 'anthropic';
   }
 
+  private parseAPIErrorDetail(errorText: string): string {
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error?.message) return parsed.error.message;
+      if (parsed.message) return parsed.message;
+    } catch {
+      // Not JSON, use raw text
+    }
+    return errorText.substring(0, 200);
+  }
+
+  private formatAPIError(provider: string, status: number, detail: string): string {
+    switch (status) {
+      case 401:
+        return `${provider} API authentication failed: Invalid or expired API key. Check that LLM_API_KEY or ANTHROPIC_API_KEY is set correctly.`;
+      case 403:
+        return `${provider} API access denied: Your API key does not have permission for this operation. Detail: ${detail}`;
+      case 404:
+        return `${provider} API model not found: The requested model may not exist or you may not have access to it. Detail: ${detail}`;
+      case 429:
+        return `${provider} API rate limit exceeded: Too many requests or token quota exhausted. Please wait and retry. Detail: ${detail}`;
+      case 500:
+        return `${provider} API internal server error: The API service encountered an unexpected error. This is usually temporary. Detail: ${detail}`;
+      case 502:
+      case 503:
+        return `${provider} API service unavailable: The API is temporarily down or overloaded. Please retry shortly. Detail: ${detail}`;
+      case 529:
+        return `${provider} API overloaded: The API is currently overloaded. Please retry after a brief wait. Detail: ${detail}`;
+      default:
+        return `${provider} API error (HTTP ${status}): ${detail}`;
+    }
+  }
+
   async complete(messages: LLMMessage[], options?: LLMCompletionOptions): Promise<LLMCompletionResult> {
     const model = options?.model || this.defaultModel;
 
@@ -97,11 +130,21 @@ class AnthropicClient implements LLMClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('Anthropic API error', new Error(errorText), { status: response.status });
-      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+      const errorDetail = this.parseAPIErrorDetail(errorText);
+      logger.error('Anthropic API error', new Error(errorText), {
+        status: response.status,
+        model,
+        messageCount: messages.length,
+        errorDetail,
+      });
+      throw new Error(this.formatAPIError('Anthropic', response.status, errorDetail));
     }
 
     const data = await response.json() as AnthropicResponse;
+
+    if (!data.content || data.content.length === 0) {
+      logger.warn('Anthropic API returned empty content', { model: data.model });
+    }
 
     const content = data.content?.[0]?.text || '';
 
@@ -143,6 +186,37 @@ class OpenAIClient implements LLMClient {
     return 'openai';
   }
 
+  private parseAPIErrorDetail(errorText: string): string {
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error?.message) return parsed.error.message;
+      if (parsed.message) return parsed.message;
+    } catch {
+      // Not JSON, use raw text
+    }
+    return errorText.substring(0, 200);
+  }
+
+  private formatAPIError(provider: string, status: number, detail: string): string {
+    switch (status) {
+      case 401:
+        return `${provider} API authentication failed: Invalid or expired API key. Check that LLM_API_KEY or OPENAI_API_KEY is set correctly.`;
+      case 403:
+        return `${provider} API access denied: Your API key does not have permission for this operation. Detail: ${detail}`;
+      case 404:
+        return `${provider} API model not found: The requested model may not exist or you may not have access to it. Detail: ${detail}`;
+      case 429:
+        return `${provider} API rate limit exceeded: Too many requests or token quota exhausted. Please wait and retry. Detail: ${detail}`;
+      case 500:
+        return `${provider} API internal server error: The API service encountered an unexpected error. This is usually temporary. Detail: ${detail}`;
+      case 502:
+      case 503:
+        return `${provider} API service unavailable: The API is temporarily down or overloaded. Please retry shortly. Detail: ${detail}`;
+      default:
+        return `${provider} API error (HTTP ${status}): ${detail}`;
+    }
+  }
+
   async complete(messages: LLMMessage[], options?: LLMCompletionOptions): Promise<LLMCompletionResult> {
     const model = options?.model || this.defaultModel;
 
@@ -179,11 +253,21 @@ class OpenAIClient implements LLMClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('OpenAI API error', new Error(errorText), { status: response.status });
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      const errorDetail = this.parseAPIErrorDetail(errorText);
+      logger.error('OpenAI API error', new Error(errorText), {
+        status: response.status,
+        model,
+        messageCount: messages.length,
+        errorDetail,
+      });
+      throw new Error(this.formatAPIError('OpenAI', response.status, errorDetail));
     }
 
     const data = await response.json() as OpenAIResponse;
+
+    if (!data.choices || data.choices.length === 0) {
+      logger.warn('OpenAI API returned empty choices', { model: data.model });
+    }
 
     const content = data.choices?.[0]?.message?.content || '';
 
@@ -246,7 +330,18 @@ export async function complete(
   options?: LLMCompletionOptions
 ): Promise<LLMCompletionResult> {
   const client = getLLMClient();
-  return client.complete(messages, options);
+  try {
+    return await client.complete(messages, options);
+  } catch (error) {
+    // Enhance network-level errors with more context
+    if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('network'))) {
+      throw new Error(`LLM API network error: Unable to reach ${client.getProvider()} API. Check your internet connection and API endpoint configuration. Original error: ${error.message}`);
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`LLM API timeout: Request to ${client.getProvider()} API timed out. The model may be overloaded or the request too large.`);
+    }
+    throw error;
+  }
 }
 
 // ============================================================================
@@ -319,16 +414,17 @@ export async function completeWithJSON<T>(
   try {
     // Use robust JSON extraction
     const jsonStr = extractJSON(content);
-    
+
     if (!jsonStr) {
       logger.warn('No JSON found in LLM response', { content: content.substring(0, 200) });
-      return { result: null, raw: content, error: 'No JSON found in response' };
+      return { result: null, raw: content, error: `LLM response did not contain valid JSON. The model returned plain text instead of the expected structured format. Response preview: "${content.substring(0, 100)}..."` };
     }
 
     const parsed = JSON.parse(jsonStr) as T;
     return { result: parsed, raw: content };
   } catch (error) {
+    const parseError = error instanceof Error ? error.message : String(error);
     logger.warn('Failed to parse JSON from LLM response', { content: content.substring(0, 200) }, error);
-    return { result: null, raw: content, error: `JSON parse error: ${error}` };
+    return { result: null, raw: content, error: `LLM response contained malformed JSON that could not be parsed. Parse error: ${parseError}. Response preview: "${content.substring(0, 100)}..."` };
   }
 }

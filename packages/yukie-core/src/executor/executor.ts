@@ -120,15 +120,28 @@ export class Executor {
       };
     } catch (error) {
       const timing = totalTimer();
-      logger.error('Plan execution error', error, { planId: plan.id });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const completedCount = results.filter((r) => r.success).length;
+      const failedCount = results.filter((r) => !r.success).length;
+      const remainingCount = plan.toolCalls.length - results.length;
+
+      logger.error('Plan execution error', error, {
+        planId: plan.id,
+        completedCalls: completedCount,
+        failedCalls: failedCount,
+        remainingCalls: remainingCount,
+        totalPlannedCalls: plan.toolCalls.length,
+        executionMode: plan.executionMode,
+        errorMessage,
+      });
 
       return {
         planId: plan.id,
         success: false,
         results,
         totalDurationMs: timing.durationMs,
-        completedCalls: results.filter((r) => r.success).length,
-        failedCalls: results.filter((r) => !r.success).length + (plan.toolCalls.length - results.length),
+        completedCalls: completedCount,
+        failedCalls: failedCount + remainingCount,
         workingState,
       };
     }
@@ -159,6 +172,7 @@ export class Executor {
 
       if (!service) {
         const timing = timer();
+        const availableServices = registry.getAll().map(s => s.id).join(', ');
         return {
           id: call.id,
           serviceId: call.serviceId,
@@ -166,7 +180,7 @@ export class Executor {
           success: false,
           error: {
             code: 'SERVICE_NOT_FOUND',
-            message: `Service ${call.serviceId} not found`,
+            message: `Service '${call.serviceId}' not found in the enhanced registry. Cannot execute tool '${call.toolName}'. Available services: [${availableServices || 'none'}]`,
           },
           durationMs: timing.durationMs,
         };
@@ -200,7 +214,27 @@ export class Executor {
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.warn('Tool call failed', { callId: call.id, status: response.status });
+        const statusDescription =
+          response.status === 400 ? 'Bad Request - the request parameters may be invalid' :
+          response.status === 401 ? 'Unauthorized - authentication credentials are missing or invalid' :
+          response.status === 403 ? 'Forbidden - insufficient permissions for this operation' :
+          response.status === 404 ? 'Not Found - the service endpoint or tool does not exist' :
+          response.status === 408 ? 'Request Timeout - the service took too long to respond' :
+          response.status === 429 ? 'Rate Limited - too many requests to this service' :
+          response.status === 500 ? 'Internal Server Error - the service encountered an unexpected error' :
+          response.status === 502 ? 'Bad Gateway - the service is unreachable' :
+          response.status === 503 ? 'Service Unavailable - the service is temporarily down' :
+          response.status === 504 ? 'Gateway Timeout - the service did not respond in time' :
+          `HTTP ${response.status}`;
+
+        logger.warn('Tool call failed', {
+          callId: call.id,
+          serviceId: call.serviceId,
+          toolName: call.toolName,
+          status: response.status,
+          statusDescription,
+          responseBody: errorText.substring(0, 200),
+        });
 
         return {
           id: call.id,
@@ -209,8 +243,8 @@ export class Executor {
           success: false,
           error: {
             code: 'INVOCATION_FAILED',
-            message: `Service returned error: ${response.status}`,
-            details: { body: errorText },
+            message: `Tool '${call.toolName}' on service '${call.serviceId}' failed: ${statusDescription}`,
+            details: { body: errorText.substring(0, 500), status: response.status },
           },
           durationMs: timing.durationMs,
         };
@@ -239,7 +273,28 @@ export class Executor {
       };
     } catch (error) {
       const timing = timer();
-      logger.error('Tool call error', error, { callId: call.id });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Categorize the error for better diagnostics
+      let code = 'EXECUTION_ERROR';
+      let message = errorMessage;
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        code = 'TIMEOUT';
+        message = `Tool '${call.toolName}' on service '${call.serviceId}' timed out after ${opts.timeout || DEFAULT_OPTIONS.timeout}ms. The service may be overloaded or the operation is too complex.`;
+      } else if (error instanceof TypeError && (errorMessage.includes('fetch') || errorMessage.includes('Failed'))) {
+        code = 'CONNECTION_ERROR';
+        message = `Cannot reach service '${call.serviceId}' to execute tool '${call.toolName}'. The service may be down or the URL is incorrect. Original error: ${errorMessage}`;
+      } else {
+        message = `Unexpected error executing tool '${call.toolName}' on service '${call.serviceId}': ${errorMessage}`;
+      }
+
+      logger.error('Tool call error', error, {
+        callId: call.id,
+        serviceId: call.serviceId,
+        toolName: call.toolName,
+        errorCode: code,
+      });
 
       return {
         id: call.id,
@@ -247,8 +302,8 @@ export class Executor {
         toolName: call.toolName,
         success: false,
         error: {
-          code: 'EXECUTION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
+          code,
+          message,
         },
         durationMs: timing.durationMs,
       };

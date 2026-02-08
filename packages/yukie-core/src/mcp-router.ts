@@ -51,12 +51,13 @@ export async function routeToTool(
     : allServices;
 
   if (services.length === 0) {
+    const allServiceIds = allServices.map(s => s.id).join(', ');
     return {
       selectedTool: null,
       confidence: 1.0,
       reasoning: targetService
-        ? `Target service '${targetService}' is not available`
-        : 'No services are currently available',
+        ? `Target service '${targetService}' is not available or not enabled. Available services: [${allServiceIds || 'none registered'}]`
+        : 'No services are currently enabled in the registry. Check service configuration.',
     };
   }
 
@@ -76,10 +77,11 @@ export async function routeToTool(
   }
 
   if (allTools.length === 0) {
+    const serviceNames = services.map(s => `${s.name} (${s.id})`).join(', ');
     return {
       selectedTool: null,
       confidence: 0,
-      reasoning: 'No tools available from any service',
+      reasoning: `No tools could be fetched from any service. Checked services: [${serviceNames}]. Services may be down or not exposing MCP tools.`,
     };
   }
 
@@ -139,11 +141,16 @@ If no tool is appropriate, respond with:
     const timing = timer();
 
     if (!result || error) {
-      logger.warn('Failed to parse tool selection result', { error, durationMs: timing.durationMs });
+      logger.warn('Failed to parse tool selection result', {
+        error,
+        durationMs: timing.durationMs,
+        toolCount: allTools.length,
+        userMessage: userMessage.substring(0, 100),
+      });
       return {
         selectedTool: null,
         confidence: 0,
-        reasoning: 'Failed to determine tool selection',
+        reasoning: `Tool selection failed: LLM did not return a valid routing decision. ${error || 'No result returned.'}`,
       };
     }
 
@@ -171,11 +178,15 @@ If no tool is appropriate, respond with:
       reasoning: result.reasoning,
     };
   } catch (error) {
-    logger.error('Tool routing error', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Tool routing error', error, {
+      toolCount: allTools.length,
+      userMessage: userMessage.substring(0, 100),
+    });
     return {
       selectedTool: null,
       confidence: 0,
-      reasoning: 'Tool routing failed due to an error',
+      reasoning: `Tool routing failed: ${errorMessage}`,
     };
   }
 }
@@ -415,7 +426,11 @@ export async function formatResponse(
 
     return result.content;
   } catch (error) {
-    logger.warn('Failed to format response with LLM', {}, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.warn('Failed to format response with LLM, using raw tool output', {
+      serviceName,
+      errorMessage,
+    }, error);
 
     // Return content from the tool result as fallback
     const textContent = toolResult.content
@@ -450,7 +465,18 @@ export async function generateFallbackResponse(userMessage: string, model?: stri
 
     return result.content;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Fallback response generation failed', error);
+
+    if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+      return "I'm temporarily unable to respond due to API rate limits being reached. Please wait a moment and try again.";
+    }
+    if (errorMessage.includes('authentication') || errorMessage.includes('401')) {
+      return "I'm unable to respond due to an API configuration issue. Please contact the administrator.";
+    }
+    if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('timeout')) {
+      return "I'm having trouble connecting to the AI service right now. Please check your connection and try again.";
+    }
     return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
   }
 }
@@ -976,7 +1002,21 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
       .filter((c) => c.type === 'text' && c.text)
       .map((c) => c.text)
       .join('\n');
-    response = `I encountered an issue: ${errorText || 'Unknown error'}. Please try again.`;
+
+    // Provide more context-aware error messages
+    let errorResponse: string;
+    if (errorText.includes('not found')) {
+      errorResponse = `The requested operation could not be completed because the tool or service was not found. Details: ${errorText}`;
+    } else if (errorText.includes('timeout') || errorText.includes('timed out')) {
+      errorResponse = `The service '${serviceName}' took too long to respond. It may be temporarily overloaded. Please try again. Details: ${errorText}`;
+    } else if (errorText.includes('permission') || errorText.includes('Insufficient')) {
+      errorResponse = `You don't have the required permissions for this operation on '${serviceName}'. Details: ${errorText}`;
+    } else if (errorText.includes('connect') || errorText.includes('reach')) {
+      errorResponse = `Unable to reach the service '${serviceName}'. It may be temporarily down. Please try again later. Details: ${errorText}`;
+    } else {
+      errorResponse = `The service '${serviceName}' returned an error while executing '${toolCall.toolName}': ${errorText || 'Unknown error'}. Please try again.`;
+    }
+    response = errorResponse;
   } else {
     const filteredForFormat = {
       ...toolResult,

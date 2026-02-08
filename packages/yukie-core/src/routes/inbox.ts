@@ -68,8 +68,11 @@ export function handleListInbox(req: AuthenticatedRequest, res: Response): void 
 
     res.json(result);
   } catch (error) {
-    logger.error('Error listing inbox', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    logger.error('Error listing inbox', error, { userId: req.auth!.userId });
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to retrieve inbox items. Please try again.',
+    });
   }
 }
 
@@ -90,8 +93,11 @@ export function handleInboxStats(req: AuthenticatedRequest, res: Response): void
 
     res.json(stats);
   } catch (error) {
-    logger.error('Error getting inbox stats', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    logger.error('Error getting inbox stats', error, { userId: req.auth!.userId });
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to retrieve inbox statistics. Please try again.',
+    });
   }
 }
 
@@ -108,13 +114,13 @@ export function handleGetJob(req: AuthenticatedRequest, res: Response): void {
     const job = getJob(jobId);
 
     if (!job) {
-      res.status(404).json({ error: 'Not Found', message: 'Job not found' });
+      res.status(404).json({ error: 'Not Found', message: `Job '${jobId}' not found. It may have been deleted or the ID is incorrect.` });
       return;
     }
 
     // Ensure user owns this job
     if (job.userId !== req.auth!.userId) {
-      res.status(403).json({ error: 'Forbidden', message: 'Access denied' });
+      res.status(403).json({ error: 'Forbidden', message: 'You do not have permission to access this job.' });
       return;
     }
 
@@ -122,8 +128,11 @@ export function handleGetJob(req: AuthenticatedRequest, res: Response): void {
 
     res.json(job);
   } catch (error) {
-    logger.error('Error getting job', error, { jobId });
-    res.status(500).json({ error: 'Internal Server Error' });
+    logger.error('Error getting job', error, { jobId, userId: req.auth!.userId });
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: `Failed to retrieve job '${jobId}'. Please try again.`,
+    });
   }
 }
 

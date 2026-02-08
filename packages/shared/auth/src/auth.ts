@@ -113,7 +113,7 @@ export async function validateToken(token: string): Promise<ValidateTokenResult>
     const parts = token.split('.');
 
     if (parts.length !== 3) {
-      return { valid: false, error: 'Invalid token format' };
+      return { valid: false, error: 'Invalid token format: Expected JWT with 3 parts (header.payload.signature)' };
     }
 
     const [headerEncoded, payloadEncoded, signature] = parts;
@@ -122,7 +122,7 @@ export async function validateToken(token: string): Promise<ValidateTokenResult>
     // Verify signature
     const isValid = await hmacVerify(message, signature, secret);
     if (!isValid) {
-      return { valid: false, error: 'Invalid signature' };
+      return { valid: false, error: 'Invalid token signature: The token may have been tampered with or the JWT_SECRET has changed' };
     }
 
     // Decode payload
@@ -131,12 +131,14 @@ export async function validateToken(token: string): Promise<ValidateTokenResult>
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp < now) {
-      return { valid: false, error: 'Token expired' };
+      const expiredAgo = now - payload.exp;
+      return { valid: false, error: `Token expired ${expiredAgo}s ago. Please log in again to get a new token.` };
     }
 
     return { valid: true, payload };
   } catch (error) {
-    return { valid: false, error: `Token validation failed: ${error}` };
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { valid: false, error: `Token validation failed: ${errorMsg}` };
   }
 }
 
@@ -247,7 +249,7 @@ export async function authenticateRequest(options: AuthenticateRequestOptions): 
     };
   }
 
-  return { success: false, error: 'No authentication credentials provided' };
+  return { success: false, error: 'No authentication credentials provided. Send a Bearer token in the Authorization header, set a yukie_session cookie, or provide X-Yukie-User-Id and X-Yukie-Scopes headers.' };
 }
 
 // ============================================================================
@@ -297,7 +299,7 @@ export function createAuthMiddleware(requiredScopes?: string[]) {
       if (!scopeCheck.authorized) {
         res.status(403).json({
           error: 'Forbidden',
-          message: 'Insufficient permissions',
+          message: `Insufficient permissions. Required scopes: [${requiredScopes.join(', ')}]. Missing: [${scopeCheck.missingScopes?.join(', ') || ''}]`,
           missingScopes: scopeCheck.missingScopes,
         });
         return;

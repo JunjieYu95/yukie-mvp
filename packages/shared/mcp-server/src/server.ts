@@ -194,13 +194,18 @@ export class MCPServer {
           break;
 
         default:
-          return this.errorResponse(id, MCPErrorCodes.METHOD_NOT_FOUND, `Unknown method: ${method}`);
+          return this.errorResponse(
+            id,
+            MCPErrorCodes.METHOD_NOT_FOUND,
+            `Unknown MCP method '${method}' on server '${this.config.name}'. Supported methods: initialize, initialized, ping, tools/list, tools/call, resources/list, resources/read, prompts/list, prompts/get`
+          );
       }
 
       return { jsonrpc: '2.0', id, result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return this.errorResponse(id, MCPErrorCodes.INTERNAL_ERROR, message);
+      const errorCode = error instanceof MCPError ? error.code : MCPErrorCodes.INTERNAL_ERROR;
+      return this.errorResponse(id, errorCode, `MCP server '${this.config.name}' error handling '${method}': ${message}`);
     }
   }
 
@@ -236,7 +241,11 @@ export class MCPServer {
     const tool = this.tools.get(name);
 
     if (!tool) {
-      throw new MCPError(MCPErrorCodes.TOOL_NOT_FOUND, `Tool not found: ${name}`);
+      const availableTools = Array.from(this.tools.keys()).join(', ');
+      throw new MCPError(
+        MCPErrorCodes.TOOL_NOT_FOUND,
+        `Tool '${name}' not found on MCP server '${this.config.name}'. Available tools: [${availableTools || 'none'}]`
+      );
     }
 
     // Check scopes if required
@@ -244,7 +253,11 @@ export class MCPServer {
       const userScopes = ctx.scopes || [];
       const hasRequired = tool.requiredScopes.every((s) => userScopes.includes(s) || userScopes.includes('admin'));
       if (!hasRequired) {
-        throw new MCPError(MCPErrorCodes.INVALID_PARAMS, 'Insufficient permissions');
+        const missing = tool.requiredScopes.filter(s => !userScopes.includes(s) && !userScopes.includes('admin'));
+        throw new MCPError(
+          MCPErrorCodes.INVALID_PARAMS,
+          `Insufficient permissions to call tool '${name}'. Required scopes: [${tool.requiredScopes.join(', ')}]. Missing: [${missing.join(', ')}]. User scopes: [${userScopes.join(', ')}]`
+        );
       }
     }
 
@@ -267,7 +280,11 @@ export class MCPServer {
     const resource = this.resources.get(uri);
 
     if (!resource) {
-      throw new MCPError(MCPErrorCodes.RESOURCE_NOT_FOUND, `Resource not found: ${uri}`);
+      const availableResources = Array.from(this.resources.keys()).join(', ');
+      throw new MCPError(
+        MCPErrorCodes.RESOURCE_NOT_FOUND,
+        `Resource '${uri}' not found on MCP server '${this.config.name}'. Available resources: [${availableResources || 'none'}]`
+      );
     }
 
     return await resource.handler(uri, ctx);
@@ -289,7 +306,11 @@ export class MCPServer {
     const prompt = this.prompts.get(name);
 
     if (!prompt) {
-      throw new MCPError(MCPErrorCodes.PROMPT_NOT_FOUND, `Prompt not found: ${name}`);
+      const availablePrompts = Array.from(this.prompts.keys()).join(', ');
+      throw new MCPError(
+        MCPErrorCodes.PROMPT_NOT_FOUND,
+        `Prompt '${name}' not found on MCP server '${this.config.name}'. Available prompts: [${availablePrompts || 'none'}]`
+      );
     }
 
     return await prompt.handler(args || {}, ctx);

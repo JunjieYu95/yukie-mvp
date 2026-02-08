@@ -60,7 +60,26 @@ async function callAnthropicDirect(messages: ChatMessage[], model?: string): Pro
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+    let errorDetail = errorText.substring(0, 200);
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error?.message) errorDetail = parsed.error.message;
+    } catch { /* not JSON */ }
+
+    switch (response.status) {
+      case 401:
+        throw new Error(`Anthropic API authentication failed: Invalid or expired API key. Check ANTHROPIC_API_KEY environment variable.`);
+      case 429:
+        throw new Error(`Anthropic API rate limit exceeded: Too many requests or token quota exhausted. Please wait and retry. Detail: ${errorDetail}`);
+      case 500:
+      case 502:
+      case 503:
+        throw new Error(`Anthropic API service error (HTTP ${response.status}): The API is temporarily unavailable. Please retry shortly. Detail: ${errorDetail}`);
+      case 529:
+        throw new Error(`Anthropic API overloaded: The API is currently overloaded. Please retry after a brief wait.`);
+      default:
+        throw new Error(`Anthropic API error (HTTP ${response.status}): ${errorDetail}`);
+    }
   }
 
   const data = (await response.json()) as { content?: Array<{ text?: string }> };
@@ -164,11 +183,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         ensureRegistryInitialized();
       } catch (initError) {
+        const initMsg = initError instanceof Error ? initError.message : String(initError);
         console.error('[CHAT] Registry initialization failed:', initError);
         res.status(500).json({
           error: 'Internal Server Error',
-          message: 'Registry initialization failed: ' + (initError instanceof Error ? initError.message : String(initError)),
+          message: 'Service registry failed to initialize. No services are available to handle your request. This usually indicates a configuration issue.',
           stage: 'registry_init',
+          detail: initMsg,
         });
         return;
       }
@@ -185,11 +206,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           model: body.model,
         });
       } catch (processError) {
+        const errorMsg = processError instanceof Error ? processError.message : String(processError);
         console.error('[CHAT] processMCPChatMessage failed:', processError);
+
+        // Categorize for user-friendly error messages
+        let userMessage: string;
+        let stage: string;
+
+        if (errorMsg.includes('rate limit') || errorMsg.includes('429')) {
+          userMessage = 'The AI service is currently rate limited. Please wait a moment and try again.';
+          stage = 'llm_rate_limit';
+        } else if (errorMsg.includes('authentication') || errorMsg.includes('401') || errorMsg.includes('API key')) {
+          userMessage = 'There is an issue with the AI service configuration. Please contact the administrator.';
+          stage = 'llm_auth';
+        } else if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+          userMessage = 'The request took too long to process. Please try again.';
+          stage = 'timeout';
+        } else if (errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('Cannot reach')) {
+          userMessage = 'Unable to connect to a required service. Please try again later.';
+          stage = 'network';
+        } else if (errorMsg.includes('not found')) {
+          userMessage = 'The requested service or tool could not be found.';
+          stage = 'not_found';
+        } else {
+          userMessage = 'An error occurred while processing your message. Please try again.';
+          stage = 'process_chat';
+        }
+
         res.status(500).json({
           error: 'Internal Server Error',
-          message: 'Chat processing failed: ' + (processError instanceof Error ? processError.message : String(processError)),
-          stage: 'process_chat',
+          message: userMessage,
+          stage,
+          detail: errorMsg,
         });
         return;
       }
@@ -233,12 +281,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     console.error('[CHAT] Unhandled error:', error);
     logger.error('Chat error', error, { userId: auth.userId, requestId });
+
+    let userMessage: string;
+    let stage: string;
+
+    if (errorMsg.includes('rate limit') || errorMsg.includes('429')) {
+      userMessage = 'The AI service is currently rate limited. Please wait and try again.';
+      stage = 'llm_rate_limit';
+    } else if (errorMsg.includes('authentication') || errorMsg.includes('API key')) {
+      userMessage = 'There is a service configuration issue. Please contact the administrator.';
+      stage = 'llm_auth';
+    } else if (errorMsg.includes('timeout') || errorMsg.includes('timed out')) {
+      userMessage = 'The request timed out. Please try again.';
+      stage = 'timeout';
+    } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+      userMessage = 'Unable to reach a required service. Please try again later.';
+      stage = 'network';
+    } else {
+      userMessage = 'An unexpected error occurred while processing your message. Please try again.';
+      stage = 'unknown';
+    }
+
     res.status(500).json({
       error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'An error occurred while processing your message',
-      stage: 'unknown',
+      message: userMessage,
+      stage,
+      detail: errorMsg,
     });
   }
 }

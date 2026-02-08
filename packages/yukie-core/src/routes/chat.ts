@@ -112,11 +112,45 @@ export async function handleChat(req: AuthenticatedRequest, res: Response): Prom
     res.json(response);
   } catch (error) {
     const timing = timer();
-    logger.error('Chat processing error', error, { durationMs: timing.durationMs });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Categorize the error for better user feedback
+    let userMessage: string;
+    let errorStage: string;
+
+    if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+      userMessage = 'The AI service is currently rate limited. Please wait a moment and try again.';
+      errorStage = 'llm_rate_limit';
+    } else if (errorMessage.includes('authentication') || errorMessage.includes('401') || errorMessage.includes('API key')) {
+      userMessage = 'There is an issue with the AI service configuration. Please contact the administrator.';
+      errorStage = 'llm_auth';
+    } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out') || errorMessage.includes('AbortError')) {
+      userMessage = 'The request took too long to process. Please try a simpler request or try again later.';
+      errorStage = 'timeout';
+    } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Cannot reach')) {
+      userMessage = 'Unable to connect to a required service. Please try again later.';
+      errorStage = 'network';
+    } else if (errorMessage.includes('Service') && errorMessage.includes('not found')) {
+      userMessage = 'The requested service could not be found. It may have been removed or is temporarily unavailable.';
+      errorStage = 'service_not_found';
+    } else if (errorMessage.includes('MCP') || errorMessage.includes('JSON-RPC')) {
+      userMessage = 'A service communication error occurred. The external service may be experiencing issues.';
+      errorStage = 'mcp_error';
+    } else {
+      userMessage = 'An unexpected error occurred while processing your message. Please try again.';
+      errorStage = 'unknown';
+    }
+
+    logger.error('Chat processing error', error, {
+      durationMs: timing.durationMs,
+      errorStage,
+      userId: req.auth?.userId,
+    });
 
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'An error occurred while processing your message',
+      message: userMessage,
+      stage: errorStage,
     });
   }
 }
