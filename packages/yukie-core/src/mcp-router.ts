@@ -468,17 +468,45 @@ export async function generateFallbackResponse(userMessage: string, model?: stri
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Fallback response generation failed', error);
 
-    if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-      return "I'm temporarily unable to respond due to API rate limits being reached. Please wait a moment and try again.";
-    }
-    if (errorMessage.includes('authentication') || errorMessage.includes('401')) {
-      return "I'm unable to respond due to an API configuration issue. Please contact the administrator.";
-    }
-    if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('timeout')) {
-      return "I'm having trouble connecting to the AI service right now. Please check your connection and try again.";
-    }
-    return "I'm sorry, I'm having trouble processing your request right now. Please try again later.";
+    return classifyAndFormatLLMError(errorMessage);
   }
+}
+
+/**
+ * Classifies an LLM error message and returns a user-friendly description.
+ * Used by both generateFallbackResponse and processMCPChatMessage to ensure
+ * actual error details always reach the user.
+ */
+function classifyAndFormatLLMError(errorMessage: string): string {
+  const msg = errorMessage.toLowerCase();
+
+  if (msg.includes('rate limit') || msg.includes('rate_limit') || msg.includes('429') || msg.includes('too many requests') || msg.includes('quota') || msg.includes('overloaded') || msg.includes('529')) {
+    return `I'm temporarily unable to respond because the AI service is rate-limited or overloaded. Please wait a moment and try again. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('authentication') || msg.includes('unauthorized') || msg.includes('401') || msg.includes('api key') || msg.includes('api_key') || msg.includes('invalid key') || msg.includes('403') || msg.includes('forbidden') || msg.includes('access denied')) {
+    return `I'm unable to respond due to an AI service authentication or permission issue. Please contact the administrator. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborterror') || msg.includes('deadline') || msg.includes('took too long')) {
+    return `The AI service took too long to respond. Please try again. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('econnrefused') || msg.includes('econnreset') || msg.includes('enotfound') || msg.includes('dns') || msg.includes('socket') || msg.includes('cannot reach') || msg.includes('unable to reach')) {
+    return `I'm having trouble connecting to the AI service. Please check the connection and try again. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
+    return `The configured AI model could not be found or is invalid. Please check the model configuration. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('content filter') || msg.includes('safety') || msg.includes('blocked')) {
+    return `The AI service could not process this request due to content filtering. Please try rephrasing your message. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('context length') || msg.includes('too long') || msg.includes('max tokens') || msg.includes('token limit')) {
+    return `The request was too large for the AI service to process. Please try a shorter message. (Error: ${errorMessage})`;
+  }
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('internal server error') || msg.includes('bad gateway') || msg.includes('service unavailable')) {
+    return `The AI service is temporarily experiencing issues. Please try again shortly. (Error: ${errorMessage})`;
+  }
+
+  // Always include the actual error message so the user/developer can diagnose
+  return `I'm having trouble processing your request. (Error: ${errorMessage})`;
 }
 
 // ============================================================================
@@ -931,8 +959,23 @@ export async function processMCPChatMessage(options: MCPChatFlowOptions): Promis
 
   // Step 2: Handle routing result
   if (!routing.selectedTool || routing.confidence < 0.5) {
-    // No good tool match - generate a fallback response
-    const response = await generateFallbackResponse(message, model);
+    // Check if routing itself failed due to an LLM/network error.
+    // If so, don't attempt another LLM call (it will also fail).
+    const routingFailedDueToError = routing.reasoning.startsWith('Tool routing failed:') ||
+      routing.reasoning.startsWith('Tool selection failed:');
+
+    let response: string;
+    if (routingFailedDueToError) {
+      // Extract the error from the routing reasoning and format it for the user
+      logger.warn('Routing failed due to LLM/network error, skipping fallback LLM call', {
+        reasoning: routing.reasoning,
+      });
+      response = classifyAndFormatLLMError(routing.reasoning);
+    } else {
+      // Routing worked but no tool matched - use LLM for a conversational response
+      response = await generateFallbackResponse(message, model);
+    }
+
     return {
       response,
       routingConfidence: routing.confidence,

@@ -400,12 +400,13 @@ export const useChatStore = defineStore('chat', () => {
       openclawStatus.value = 'offline';
       openclawStatusDetail.value = err instanceof Error ? err.message : 'Connection failed';
       updateMessage(queueItem.userMessageId, { status: 'error' });
-      error.value = err instanceof Error ? err.message : 'Failed to send message';
+      const errorMsg = err instanceof Error ? err.message : 'Failed to send message';
+      error.value = errorMsg;
 
       addMessage(
         {
           role: 'system',
-          content: 'Sorry, I had trouble processing your message. Please try again.',
+          content: `Sorry, I had trouble processing your message: ${errorMsg}`,
         },
         queueItem.contactId
       );
