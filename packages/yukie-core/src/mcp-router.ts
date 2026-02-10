@@ -45,10 +45,18 @@ export async function routeToTool(
   const registry = getMCPRegistry();
   const allServices = registry.getEnabled();
 
-  // Filter services if targetService is specified
+  // Filter services if targetService is specified (direct service chat)
   const services = targetService
     ? allServices.filter((s) => s.id === targetService)
     : allServices;
+
+  if (targetService) {
+    logger.info('Direct service routing', {
+      targetService,
+      matchedServices: services.map(s => s.id),
+      allAvailable: allServices.map(s => s.id),
+    });
+  }
 
   if (services.length === 0) {
     const allServiceIds = allServices.map(s => s.id).join(', ');
@@ -165,11 +173,40 @@ If no tool is appropriate, respond with:
     // Find the selected tool
     const selected = allTools.find((t) => t.tool.name === result.tool);
 
+    // Safety check: when targetService is specified, ensure selected tool belongs to it
+    if (targetService && selected && selected.serviceId !== targetService) {
+      logger.warn('Tool routing returned wrong service despite targetService filter', {
+        targetService,
+        selectedService: selected.serviceId,
+        selectedTool: result.tool,
+        userMessage: userMessage.substring(0, 100),
+      });
+      // Re-find limiting to the target service only
+      const corrected = allTools.find(
+        (t) => t.tool.name === result.tool && t.serviceId === targetService
+      );
+      if (!corrected) {
+        // Pick the first tool from the target service as fallback
+        const fallbackTool = allTools.find((t) => t.serviceId === targetService);
+        return {
+          selectedTool: fallbackTool || null,
+          confidence: fallbackTool ? 0.6 : 0,
+          reasoning: `LLM selected tool '${result.tool}' from wrong service '${selected.serviceId}', corrected to target service '${targetService}'.`,
+        };
+      }
+      return {
+        selectedTool: corrected,
+        confidence: result.confidence,
+        reasoning: result.reasoning,
+      };
+    }
+
     logger.info('Tool routing complete', {
       selectedTool: result.tool,
       service: result.service,
       confidence: result.confidence,
       durationMs: timing.durationMs,
+      targetService: targetService || 'auto',
     });
 
     return {

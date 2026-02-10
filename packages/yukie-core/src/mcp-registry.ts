@@ -511,30 +511,6 @@ export function getDefaultMCPServicesConfig(): { services: Array<MCPServiceRegis
         enabled: true,
       },
       {
-        id: 'workstyle',
-        name: 'Workstyle',
-        description: 'Track work tasks and time. Log task progress, take breaks, mark tasks complete, and visualize work timeline.',
-        baseUrl: process.env.WORKSTYLE_URL || 'https://workstyle-ten.vercel.app',
-        mcpEndpoint:
-          process.env.WORKSTYLE_MCP_URL ||
-          `${process.env.WORKSTYLE_URL || 'https://workstyle-ten.vercel.app'}/api/mcp`,
-        capabilities: [
-          'task tracking',
-          'work logging',
-          'time tracking',
-          'break management',
-          'task completion',
-          'gantt chart',
-          'project management',
-          'work on',
-          'start working',
-          'take a break',
-        ],
-        scopes: ['workstyle:read', 'workstyle:write'],
-        healthEndpoint: '/api/mcp',
-        enabled: true,
-      },
-      {
         id: 'ideas-log',
         name: 'Ideas Log',
         description: 'Capture ideas and retrieve research reports with summaries and full markdown.',
