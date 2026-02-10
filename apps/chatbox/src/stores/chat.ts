@@ -340,7 +340,6 @@ export const useChatStore = defineStore('chat', () => {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
-          'workstyle': 'Workstyle',
           'ideas-log': 'Ideas Log',
         };
         processingStatusByContactId.value.set(queueItem.contactId, {
@@ -369,7 +368,7 @@ export const useChatStore = defineStore('chat', () => {
           'habit-tracker': 'Habit Tracker',
           'momentum': 'Momentum',
           'diary-analyzer': 'Diary Analyzer',
-          'workstyle': 'Workstyle',
+          'ideas-log': 'Ideas Log',
         };
         const serviceName =
           serviceNameMap[response.routingDetails.targetService] ||
