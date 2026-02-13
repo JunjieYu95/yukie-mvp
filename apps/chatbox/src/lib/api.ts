@@ -95,6 +95,7 @@ async function request<T>(
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   // Check if response is JSON before parsing
@@ -174,6 +175,7 @@ export async function transcribeAudio(
     method: 'POST',
     headers,
     body: formData,
+    credentials: 'include',
   });
 
   // Check if response is JSON before parsing

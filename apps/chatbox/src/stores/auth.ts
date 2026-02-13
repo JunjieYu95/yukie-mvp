@@ -32,7 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch (error) {
       console.error('Failed to logout:', error);
     } finally {
@@ -45,7 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function refreshSession() {
     try {
-      const response = await fetch('/api/auth/me', { method: 'GET' });
+      const response = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
       if (!response.ok) return;
       const data = (await response.json()) as { userId?: string; scopes?: string[] };
       if (data.userId) {
@@ -64,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ password }),
+        credentials: 'include',
       });
 
       const contentType = response.headers.get('content-type') || '';

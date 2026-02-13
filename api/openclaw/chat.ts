@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as crypto from 'crypto';
 import WebSocket from 'ws';
 import { authenticateRequest, hasScope } from '../_lib/auth.js';
+import { setCors } from '../_lib/cors.js';
 
 type ChatRequest = {
   message: string;
@@ -20,16 +21,6 @@ type ChatEventPayload = {
   message?: { content?: Array<{ type?: string; text?: string }> };
   errorMessage?: string;
 };
-
-function setCors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Yukie-User-Id, X-Yukie-Scopes, X-Yukie-Request-Id, X-OpenClaw-Proxy-Secret'
-  );
-}
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -172,7 +163,7 @@ async function openclawSendMessage(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();

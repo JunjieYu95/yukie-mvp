@@ -95,6 +95,7 @@ export async function openclawSendMessageProxy(
     method: "POST",
     headers,
     body: JSON.stringify({ message, sessionKey }),
+    credentials: "include",
   });
 
   const data = (await response.json()) as { text?: string; error?: string; message?: string };
@@ -131,6 +132,7 @@ export async function openclawCheckConnectionProxy(token: string | null) {
   const response = await fetch("/api/openclaw/status", {
     method: "GET",
     headers,
+    credentials: "include",
   });
   const data = (await response.json()) as { connected?: boolean; message?: string };
   if (!response.ok) {

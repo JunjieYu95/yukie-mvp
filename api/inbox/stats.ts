@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { AuthContext } from '../../packages/shared/protocol/src/types';
 import { authenticateRequest } from '../../packages/shared/auth/src/auth';
+import { setCors } from '../_lib/cors.js';
 import { getInboxStats } from '../../packages/yukie-core/src/inbox';
 import { canAccessInbox, checkRateLimit } from '../../packages/yukie-core/src/policy';
 import { createLogger } from '../../packages/shared/observability/src/logger';
@@ -8,14 +9,7 @@ import { createLogger } from '../../packages/shared/observability/src/logger';
 const logger = createLogger('api-inbox-stats');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, X-Yukie-User-Id, X-Yukie-Scopes, X-Yukie-Request-Id'
-  );
+  setCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
