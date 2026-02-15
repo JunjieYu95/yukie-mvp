@@ -635,6 +635,21 @@ export async function selectToolParameters(
     return { toolName: 'momentum.stats', args: {} };
   }
 
+  // =========================================================================
+  // DIARY PROCESS MESSAGE: Pass user message directly
+  // =========================================================================
+  if (tool.name === 'diary.processMessage') {
+    // The processMessage tool expects the raw user message as the 'message' parameter
+    logger.info('Diary processMessage: Passing user message directly', { userMessage });
+    return {
+      toolName: 'diary.processMessage',
+      args: {
+        message: userMessage,
+        autoExecute: true // Let the server auto-execute if pattern extraction succeeds
+      }
+    };
+  }
+
   const schema = tool.inputSchema;
   const params = schema.properties
     ? Object.entries(schema.properties)
